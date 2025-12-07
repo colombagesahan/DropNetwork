@@ -311,6 +311,15 @@
                     });
                 },
 
+                // Add 'orders: []' to return object
+// Add 'this.loadOrders()' to init()
+
+async loadOrders() {
+    const db = firebase.firestore();
+    const snap = await db.collection('orders').where('manufacturerId', '==', this.uid).orderBy('date', 'desc').get();
+    this.orders = snap.docs.map(d => ({id: d.id, ...d.data()}));
+}
+
                 async loadReviews() {
                     const snap = await firebase.firestore().collection('agencies').doc(this.uid).collection('reviews').orderBy('date', 'desc').get();
                     this.reviews = snap.docs.map(d => d.data());
