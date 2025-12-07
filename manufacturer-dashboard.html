@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manufacturer Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <style>[x-cloak] { display: none !important; }</style>
+</head>
+<body class="bg-gray-100 font-sans" x-data="manufacturerApp()">
+
+    <!-- BLOCKED SCREEN -->
+    <div x-show="blockedStatus" x-cloak class="fixed inset-0 bg-gray-900 z-50 flex flex-col items-center justify-center text-center p-8 text-white">
+        <h1 class="text-4xl font-bold mb-2 text-red-500">ACCOUNT BLOCKED</h1>
+        <p>Your manufacturer account has been suspended by Super Admin.</p>
+        <button @click="auth.signOut()" class="mt-8 underline">Logout</button>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div x-show="!blockedStatus" class="flex h-screen overflow-hidden">
+        
+        <!-- SIDEBAR -->
+        <div class="w-64 bg-slate-900 text-white flex flex-col shadow-2xl z-10">
+            <div class="p-6 bg-slate-950 border-b border-slate-800">
+                <h1 class="text-xl font-extrabold tracking-tight text-blue-500">DropNetwork</h1>
+                <p class="text-[10px] text-gray-500 uppercase mt-1">Manufacturer Portal</p>
+            </div>
+            <div class="p-4 border-b border-slate-800 bg-slate-800/50">
+                <p class="font-bold text-white truncate" x-text="profile.agencyName || 'My Company'"></p>
+                <div class="flex items-center gap-1 text-yellow-400 text-xs mt-1">
+                    <i class="fas fa-star"></i> <span x-text="(profile.avgRating || 0).toFixed(1)"></span> 
+                    <span class="text-gray-500 ml-1" x-text="'(' + (profile.reviewCount || 0) + ')'"></span>
+                </div>
+                <div class="mt-2 inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+                     :class="plan === 'unlimited' ? 'bg-purple-600 text-white' : 'bg-gray-600 text-gray-300'">
+                    <span x-text="plan === 'unlimited' ? 'Unlimited Partners' : 'Free (Max 10 Partners)'"></span>
+                </div>
+            </div>
+            
+            <nav class="flex-1 p-2 space-y-1 overflow-y-auto">
+                <a @click="switchTab('profile')" class="block p-3 rounded hover:bg-slate-800 cursor-pointer" :class="{'bg-blue-900': tab==='profile'}"><i class="fas fa-id-card w-6 mr-2"></i> Profile <span x-show="!isBasicProfileComplete" class="text-red-400 text-xs">●</span></a>
+                <a @click="switchTab('overview')" class="block p-3 rounded hover:bg-slate-800 cursor-pointer" :class="{'bg-slate-800': tab==='overview'}"><i class="fas fa-globe w-6 mr-2"></i> Promo Website</a>
+                <a @click="switchTab('clients')" class="block p-3 rounded hover:bg-slate-800 cursor-pointer" :class="{'bg-slate-800': tab==='clients'}"><i class="fas fa-users w-6 mr-2"></i> Partners</a>
+                <a @click="switchTab('reviews')" class="block p-3 rounded hover:bg-slate-800 cursor-pointer" :class="{'bg-slate-800': tab==='reviews'}"><i class="fas fa-star w-6 mr-2"></i> Reviews</a>
+                <a @click="switchTab('orders')" class="block p-3 rounded hover:bg-slate-800 cursor-pointer" :class="{'bg-slate-800': tab==='orders'}"><i class="fas fa-box w-6 mr-2"></i> Orders</a>
+                <a @click="switchTab('chat')" class="flex justify-between items-center p-3 rounded hover:bg-slate-800 cursor-pointer" :class="{'bg-slate-800': tab==='chat'}">
+                    <span><i class="fas fa-comments w-6 mr-2"></i> Chat</span>
+                    <span x-show="unreadCount > 0" class="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full" x-text="unreadCount"></span>
+                </a>
+                <a @click="switchTab('settings')" class="block p-3 rounded hover:bg-slate-800 cursor-pointer" :class="{'bg-slate-800': tab==='settings'}"><i class="fas fa-wallet w-6 mr-2"></i> Payments</a>
+            </nav>
+            <button @click="auth.signOut()" class="p-4 text-gray-400 hover:text-white text-sm border-t border-slate-800">Logout</button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-8 relative">
+            
+            <!-- ADMIN ALERTS -->
+            <template x-for="alert in systemAlerts">
+                <div class="mb-4 rounded p-3 text-white text-sm font-bold flex justify-between items-center shadow"
+                     :class="{'bg-blue-600': alert.type === 'info', 'bg-red-600': alert.type === 'urgent'}">
+                    <span x-text="alert.sender + ': ' + alert.message"></span>
+                    <button @click="closeAlert(alert)" class="text-white opacity-50 hover:opacity-100">&times;</button>
+                </div>
+            </template>
+
+            <!-- WARNING -->
+            <div x-show="warningStatus" x-cloak class="bg-red-600 text-white p-6 rounded-xl shadow-lg mb-8 border-4 border-red-800 animate-pulse">
+                <h2 class="text-2xl font-bold">URGENT: FLAGGED</h2>
+                <p>Super Admin has flagged your account. Please pay your partners immediately.</p>
+            </div>
+
+            <!-- TAB: PROFILE -->
+            <div x-show="tab==='profile'">
+                <h2 class="text-3xl font-bold mb-2">Manufacturer Profile</h2>
+                <p class="text-gray-500 mb-6">Complete your profile to unlock features.</p>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- BASIC -->
+                    <div class="bg-white p-6 rounded shadow border-t-4 border-blue-500 h-fit">
+                        <h3 class="font-bold text-xl mb-4">1. Basic Details</h3>
+                        <div class="space-y-4">
+                            <input x-model="profile.agencyName" class="w-full border p-2 rounded" placeholder="Company Name *">
+                            <select x-model="profile.country" @change="updatePhoneCode" class="w-full border p-2 rounded bg-white">
+                                <option value="">Select Country *</option>
+                                <option value="Sri Lanka">Sri Lanka</option>
+                                <option value="United States">United States</option>
+                                <option value="United Kingdom">United Kingdom</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <input x-model="profile.ownerName" class="w-full border p-2 rounded" placeholder="Owner Name *">
+                            <input x-model="profile.phone" class="w-full border p-2 rounded" placeholder="Phone *">
+                            <input x-model="profile.whatsapp" class="w-full border p-2 rounded" placeholder="WhatsApp *">
+                            <input x-model="profile.email" class="w-full border p-2 rounded bg-gray-100" readonly>
+                            <label class="flex items-start gap-2 cursor-pointer text-sm">
+                                <input type="checkbox" x-model="profile.agreedLegal" class="mt-1"> I agree to Legal Terms.
+                            </label>
+                            <button @click="saveBasicProfile" class="w-full bg-blue-600 text-white font-bold py-3 rounded">Save Basic Profile</button>
+                        </div>
+                    </div>
+                    <!-- VERIFICATION & THEME -->
+                    <div class="space-y-8">
+                        <div class="bg-white p-6 rounded shadow border-t-4 border-teal-500">
+                            <h3 class="font-bold text-xl mb-4">Website Customization</h3>
+                            <div class="space-y-4">
+                                <select x-model="profile.theme" class="w-full border p-2 rounded">
+                                    <option value="modern">Modern Blue (Default)</option>
+                                    <option value="dark">Dark Luxury</option>
+                                    <option value="energetic">Energetic Orange</option>
+                                    <option value="corporate">Corporate Professional</option>
+                                </select>
+                                <input x-model="profile.heroTitle" class="w-full border p-2 rounded" placeholder="Hero Headline">
+                                <textarea x-model="profile.heroDesc" class="w-full border p-2 rounded" rows="2" placeholder="Hero Description"></textarea>
+                                <button @click="saveBasicProfile" class="w-full bg-teal-600 text-white font-bold py-2 rounded">Save Theme</button>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded shadow border-t-4" :class="plan === 'unlimited' ? 'border-purple-500' : 'border-gray-300'">
+                            <h3 class="font-bold text-xl mb-4">2. Verification (Unlimited)</h3>
+                            <div class="space-y-4">
+                                <input x-model="profile.targetCountries" class="w-full border p-2 rounded" placeholder="Target Countries">
+                                <input x-model="profile.address" class="w-full border p-2 rounded" placeholder="Address">
+                                <input x-model="profile.gProfile" class="w-full border p-2 rounded" placeholder="Google Profile Link">
+                                <input x-model="profile.socials" class="w-full border p-2 rounded" placeholder="Social Links">
+                                <input type="file" id="brUpload" class="w-full border p-2 rounded text-sm">
+                                <button x-show="plan !== 'unlimited'" @click="upgradePlan" class="w-full bg-purple-600 text-white font-bold py-3 rounded">Upgrade to Unlimited ($10/mo)</button>
+                                <button x-show="plan === 'unlimited'" @click="saveFullProfile" class="w-full bg-gray-800 text-white py-2 rounded">Update Details</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: REVIEWS (NEW) -->
+            <div x-show="tab==='reviews'">
+                <h2 class="text-3xl font-bold mb-6">Partner Reviews</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <template x-for="r in reviews">
+                        <div class="bg-white p-4 rounded shadow border-l-4 border-yellow-400">
+                            <div class="flex justify-between mb-2">
+                                <span class="font-bold" x-text="r.partnerName"></span>
+                                <div class="text-yellow-500 text-sm">
+                                    <template x-for="i in 5"><i class="fas fa-star" :class="i<=r.rating ? 'text-yellow-500':'text-gray-300'"></i></template>
+                                </div>
+                            </div>
+                            <p class="text-gray-600 text-sm" x-text="r.comment"></p>
+                            <p class="text-xs text-gray-400 mt-2" x-text="new Date(r.date.seconds*1000).toLocaleDateString()"></p>
+                        </div>
+                    </template>
+                    <div x-show="reviews.length === 0" class="text-gray-500">No reviews yet.</div>
+                </div>
+            </div>
+
+            <!-- TAB: PROMO WEBSITE -->
+            <div x-show="tab==='overview'">
+                <h2 class="text-3xl font-bold mb-6">My Promotional Website</h2>
+                <div x-show="isBasicProfileComplete">
+                    <div class="bg-white p-6 rounded shadow mb-6 border-l-4 border-blue-600">
+                        <h3 class="font-bold text-lg mb-2">Your Website Link</h3>
+                        <p class="text-sm text-gray-500 mb-2">Recruit partners with this link:</p>
+                        <div class="flex gap-2">
+                            <input readonly :value="promoLink" class="w-full bg-gray-100 border p-2 rounded text-sm text-gray-600">
+                            <a :href="promoLink" target="_blank" class="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700">Open</a>
+                        </div>
+                    </div>
+                </div>
+                <div x-show="!isBasicProfileComplete" class="bg-gray-200 p-10 text-center rounded">
+                    <p class="font-bold">Website Locked. Complete Profile first.</p>
+                </div>
+            </div>
+
+            <!-- TAB: PARTNERS -->
+            <div x-show="tab==='clients'">
+                <h2 class="text-3xl font-bold mb-6">Partners</h2>
+                <div class="bg-white rounded shadow overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-50"><tr><th class="p-4">Partner</th><th class="p-4">Contact</th><th class="p-4">Unpaid</th><th class="p-4">Action</th></tr></thead>
+                        <tbody>
+                            <template x-for="c in clients">
+                                <tr class="border-t">
+                                    <td class="p-4"><p class="font-bold" x-text="c.fullName || 'No Name'"></p><p class="text-xs text-gray-500" x-text="c.email"></p></td>
+                                    <td class="p-4" x-text="c.phone || '-'"></td>
+                                    <td class="p-4 font-bold text-green-600" x-text="'$' + (c.unpaidEarnings || 0)"></td>
+                                    <td class="p-4"><button @click="markPaid(c)" class="bg-green-600 text-white px-3 py-1 rounded text-xs">Mark Paid</button></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB: ORDERS -->
+            <div x-show="tab==='orders'">
+                <h2 class="text-3xl font-bold mb-6">Orders</h2>
+                <div class="bg-white rounded shadow p-10 text-center text-gray-400">Orders from Partner websites will appear here.</div>
+            </div>
+
+            <!-- TAB: CHAT -->
+            <div x-show="tab==='chat'" class="h-[80vh] flex bg-white rounded shadow overflow-hidden">
+                <div class="w-1/3 border-r overflow-y-auto">
+                    <template x-for="c in clients">
+                        <div @click="selectChat(c)" class="p-4 border-b hover:bg-gray-50 cursor-pointer" :class="activeChat?.id === c.id ? 'bg-blue-50' : ''">
+                            <p class="font-bold text-sm" x-text="c.fullName || c.email"></p>
+                            <p class="text-xs text-gray-400">Chat</p>
+                        </div>
+                    </template>
+                </div>
+                <div class="w-2/3 flex flex-col">
+                    <div x-show="!activeChat" class="flex-1 flex items-center justify-center text-gray-400">Select Partner</div>
+                    <div x-show="activeChat" class="flex-1 flex flex-col">
+                        <div class="p-4 border-b font-bold bg-gray-50" x-text="activeChat?.fullName"></div>
+                        <div class="flex-1 overflow-y-auto p-4 space-y-3" id="msgContainer">
+                            <template x-for="m in currentMessages">
+                                <div class="flex" :class="m.senderId === uid ? 'justify-end' : 'justify-start'">
+                                    <div class="px-4 py-2 rounded-lg max-w-xs text-sm" :class="m.senderId === uid ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'">
+                                        <p x-text="m.text"></p>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="p-4 border-t flex gap-2">
+                            <input x-model="chatInput" @keyup.enter="sendChat" class="flex-1 border p-2 rounded">
+                            <button @click="sendChat" class="bg-blue-600 text-white px-4 rounded">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: PAYMENTS -->
+            <div x-show="tab==='settings'">
+                <h2 class="text-3xl font-bold mb-6">Payment Settings</h2>
+                <div class="bg-white p-6 rounded shadow max-w-lg space-y-4">
+                    <input x-model="paymentData.paypal" placeholder="PayPal Email" class="w-full border p-2 rounded">
+                    <input x-model="paymentData.stripe" placeholder="Stripe Key" class="w-full border p-2 rounded">
+                    <input x-model="paymentData.payhere" placeholder="PayHere ID" class="w-full border p-2 rounded">
+                    <textarea x-model="paymentData.bank" placeholder="Bank Details" class="w-full border p-2 rounded" rows="3"></textarea>
+                    <button @click="savePayments" class="bg-slate-900 text-white px-6 py-2 rounded w-full font-bold">Save</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        function manufacturerApp() {
+            return {
+                tab: 'profile', uid: null, promoLink: '',
+                clients: [], clientCount: 0, systemAlerts: [], warningStatus: false, blockedStatus: false,
+                plan: 'free', reviews: [],
+                profile: { agencyName: '', country: '', ownerName: '', phone: '', whatsapp: '', email: '', agreedLegal: false, theme: 'modern' },
+                isBasicProfileComplete: false,
+                countryCodes: { "Sri Lanka": "+94", "United States": "+1", "United Kingdom": "+44", "Other": "" },
+                paymentData: {}, activeChat: null, chatInput: '', currentMessages: [], unreadCount: 0,
+
+                init() {
+                    auth.onAuthStateChanged(user => {
+                        if(user) {
+                            this.uid = user.uid;
+                            this.profile.email = user.email; 
+                            this.promoLink = window.location.href.split('/').slice(0,-1).join('/') + `/manufacturer-promo.html?id=${this.uid}`;
+                            this.listenData(); this.loadClients(); this.listenMessages(); this.loadReviews();
+                        } else window.location.href='index.html';
+                    });
+                },
+
+                switchTab(t) { this.tab = t; if(t==='chat') this.unreadCount=0; },
+
+                updatePhoneCode() {
+                    const code = this.countryCodes[this.profile.country] || "";
+                    if(code && !this.profile.phone.startsWith(code)) this.profile.phone = code + " ";
+                    if(code && !this.profile.whatsapp.startsWith(code)) this.profile.whatsapp = code + " ";
+                },
+
+                listenData() {
+                    firebase.firestore().collection('agencies').doc(this.uid).onSnapshot(doc => {
+                        if(doc.exists) {
+                            const data = doc.data();
+                            this.warningStatus = data.warningStatus;
+                            this.blockedStatus = data.blockedStatus;
+                            this.plan = data.plan || 'free';
+                            if(data.paymentMethods) this.paymentData = data.paymentMethods;
+                            if(data.profile) { this.profile = { ...this.profile, ...data.profile }; this.checkBasicProfile(); }
+                        }
+                    });
+                },
+
+                async loadReviews() {
+                    const snap = await firebase.firestore().collection('agencies').doc(this.uid).collection('reviews').orderBy('date', 'desc').get();
+                    this.reviews = snap.docs.map(d => d.data());
+                },
+
+                checkBasicProfile() {
+                    const p = this.profile;
+                    if(p.agencyName && p.country && p.ownerName && p.phone && p.whatsapp && p.agreedLegal) this.isBasicProfileComplete = true;
+                    else this.isBasicProfileComplete = false;
+                },
+
+                async loadClients() {
+                    const snap = await firebase.firestore().collection('users').where('parentAgency', '==', this.uid).get();
+                    this.clients = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                    this.clientCount = this.clients.length;
+                },
+
+                listenMessages() {
+                    firebase.firestore().collection('alerts').where('target', 'in', ['all', 'agencies', this.uid]).orderBy('createdAt', 'desc').limit(5)
+                      .onSnapshot(snap => { this.systemAlerts = snap.docs.map(d => d.data()); });
+                },
+
+                async saveBasicProfile() {
+                    const p = this.profile;
+                    if(!p.agencyName || !p.country || !p.ownerName || !p.phone) return alert("Fill Required Fields");
+                    
+                    await firebase.firestore().collection('agencies').doc(this.uid).set({
+                        agencyName: p.agencyName, profile: this.profile
+                    }, { merge: true });
+                    this.isBasicProfileComplete = true; alert("Saved!");
+                },
+
+                async upgradePlan() {
+                    if(!this.isBasicProfileComplete) return alert("Complete Profile first.");
+                    if(confirm("Pay $10/month?")) {
+                        await firebase.firestore().collection('agencies').doc(this.uid).set({ plan: 'unlimited', profile: this.profile }, { merge: true });
+                        alert("Upgraded!");
+                    }
+                },
+
+                async saveFullProfile() { await this.saveBasicProfile(); },
+                async savePayments() { await firebase.firestore().collection('agencies').doc(this.uid).set({ paymentMethods: this.paymentData }, { merge: true }); alert("Saved!"); },
+                async markPaid(c) { if(confirm("Mark paid?")) { await firebase.firestore().collection('users').doc(c.id).update({ unpaidEarnings: 0 }); this.loadClients(); } },
+                closeAlert(a) { this.systemAlerts = this.systemAlerts.filter(i => i !== a); },
+
+                // CHAT
+                selectChat(c) {
+                    this.activeChat = c;
+                    firebase.firestore().collection('messages').orderBy('timestamp').onSnapshot(snap => {
+                        const all = snap.docs.map(d => d.data());
+                        this.currentMessages = all.filter(m => (m.senderId===this.uid && m.receiverId===c.id) || (m.senderId===c.id && m.receiverId===this.uid));
+                        setTimeout(() => { document.getElementById('msgContainer').scrollTop = 9999; }, 100);
+                    });
+                },
+                async sendChat() {
+                    if(!this.chatInput) return;
+                    await firebase.firestore().collection('messages').add({
+                        senderId: this.uid, receiverId: this.activeChat.id, text: this.chatInput, timestamp: new Date()
+                    });
+                    this.chatInput = '';
+                }
+            }
+        }
+    </script>
+</body>
+</html>
