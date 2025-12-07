@@ -30,8 +30,7 @@
         </div>
 
         <!-- ============================================= -->
-        <!-- VIEW 1: DASHBOARD                             -->
-        <!-- (Broadcasts + Disputes)                       -->
+        <!-- VIEW 1: DASHBOARD (Broadcasts + Disputes)     -->
         <!-- ============================================= -->
         <div x-show="nav === 'dashboard'">
             
@@ -211,6 +210,7 @@
 
                 get filteredDisputes() { return this.disputes.filter(d => d.status === this.filter); },
 
+                // --- DISPUTE ACTIONS (MANUFACTURER ID = AGENCY ID) ---
                 async updateStatus(dispute, newStatus) {
                     const db = firebase.firestore();
                     await db.collection('disputes').doc(dispute.id).update({ status: newStatus });
@@ -220,6 +220,7 @@
                     if (newStatus === 'blocked') { updateData.warningStatus = true; updateData.blockedStatus = true; }
                     if (newStatus === 'open') { updateData.warningStatus = false; updateData.blockedStatus = false; }
                     
+                    // We update the 'agencies' collection (Manufacturers)
                     await db.collection('agencies').doc(dispute.agencyId).update(updateData);
                 },
 
@@ -228,7 +229,7 @@
                     const db = firebase.firestore();
                     await db.collection('alerts').add({
                         message: this.alertMsg,
-                        target: this.alertTarget,
+                        target: this.alertTarget, // 'all', 'agencies', 'clients'
                         type: this.alertType,
                         sender: 'Super Admin',
                         createdAt: new Date()
@@ -237,9 +238,10 @@
                     alert("Broadcast Sent Successfully!");
                 },
 
-                // Directory Logic
+                // --- DIRECTORY LOGIC ---
                 async loadDirectory() {
                     const db = firebase.firestore();
+                    // Manufacturers are stored in 'agencies'
                     const snap = await db.collection('agencies').get();
                     this.allAgencies = snap.docs.map(d => ({id: d.id, ...d.data()}));
                 },
@@ -253,12 +255,13 @@
                     this.agencyClients = [];
 
                     const db = firebase.firestore();
+                    // Partners are stored in 'users'
                     const snap = await db.collection('users').where('parentAgency', '==', agencyId).get();
                     this.agencyClients = snap.docs.map(d => ({id: d.id, ...d.data()}));
                     this.clientsLoading = false;
                 },
 
-                // Private Msg Logic
+                // --- PRIVATE MESSAGING LOGIC ---
                 openCompose(id, name, role) {
                     this.composeTargetId = id;
                     this.composeTargetName = name;
