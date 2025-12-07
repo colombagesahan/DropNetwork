@@ -30,7 +30,6 @@
     <!-- MAIN DASHBOARD -->
     <div x-show="profileComplete" class="flex h-screen overflow-hidden">
         
-        <!-- SIDEBAR -->
         <div class="w-64 bg-white border-r flex flex-col shadow-lg z-20">
             <div class="p-6 font-bold text-xl text-blue-600 border-b">Store Manager</div>
             <nav class="flex-1 px-4 py-4 space-y-2">
@@ -46,6 +45,15 @@
 
         <div class="flex-1 overflow-y-auto p-8 relative">
             
+            <!-- ALERTS -->
+            <template x-for="alert in systemAlerts">
+                <div class="mb-4 rounded p-3 text-white text-sm font-bold flex justify-between items-center shadow transition-all duration-500"
+                     :class="{'bg-blue-600': alert.type === 'info', 'bg-red-600': alert.type === 'urgent', 'bg-yellow-600': alert.type === 'warning'}">
+                    <span x-text="alert.sender + ': ' + alert.message"></span>
+                    <button @click="closeAlert(alert)" class="text-white opacity-50 hover:opacity-100">&times;</button>
+                </div>
+            </template>
+
             <!-- HOME -->
             <div x-show="tab==='home'">
                 <h1 class="text-2xl font-bold mb-6">Overview</h1>
@@ -144,7 +152,7 @@
                     <div class="font-bold mt-2 pt-2 border-t flex justify-between"><span>Total</span><span x-text="'$' + cartTotal"></span></div>
                     <input x-model="customerName" placeholder="Name" class="w-full border p-1 rounded mt-2 text-sm">
                     <input x-model="customerPhone" placeholder="Phone" class="w-full border p-1 rounded mt-1 text-sm">
-                    <button @click="checkout" class="w-full bg-green-500 text-white mt-2 py-1 rounded font-bold">Order on WhatsApp</button>
+                    <button @click="checkout" class="w-full bg-green-500 text-white mt-2 py-1 rounded font-bold">Order Now</button>
                 </div>
             </div>
 
@@ -188,7 +196,7 @@
         function partnerApp() {
             return {
                 tab: 'home', uid: null, userData: {}, agencyData: { agencyName: '', promoLink: '' },
-                profileComplete: false, loading: true, profileForm: {},
+                profileComplete: false, loading: true, profileForm: {}, systemAlerts: [],
                 manufacturerCatalog: [], myInventory: [], categories: [], filterCategory: '', catalogLoading: true,
                 messages: [], chatInput: '', reviewRating: 0, reviewText: '', cart: [], customerName: '', customerPhone: '',
 
@@ -213,6 +221,7 @@
                                     this.listenManufacturer(this.userData.parentAgency);
                                     this.listenCatalog(this.userData.parentAgency);
                                     this.listenChat();
+                                    this.listenMessages();
                                 }
                                 this.listenMyInventory();
                             } else this.profileComplete = false;
@@ -243,6 +252,14 @@
                         this.myInventory = snap.docs.map(d => ({id: d.id, ...d.data()}));
                     });
                 },
+                
+                listenMessages() {
+                    // Listen for Alerts (Global, Clients, or Me)
+                    firebase.firestore().collection('alerts')
+                      .where('target', 'in', ['all', 'clients', this.uid])
+                      .orderBy('createdAt', 'desc').limit(10)
+                      .onSnapshot(snap => { this.systemAlerts = snap.docs.map(d => d.data()); });
+                },
 
                 isStockAvailable(originalId) { const p = this.manufacturerCatalog.find(i => i.id === originalId); return p && p.stock > 0; },
                 getStockStatus(originalId) { const p = this.manufacturerCatalog.find(i => i.id === originalId); return (p && p.stock > 0) ? 'In Stock ('+p.stock+')' : 'Out of Stock'; },
@@ -250,7 +267,6 @@
                 async importProduct(p) {
                     if(this.myInventory.find(i => i.name === p.name)) return alert("Already added!");
                     const img = this.getImage(p);
-                    // Sanitize proxy
                     await firebase.firestore().collection('users').doc(this.uid).collection('products').add({
                         name: p.name, basePrice: p.price, sellingPrice: p.price, image: img, originalId: p.id, category: p.category || 'General'
                     });
@@ -274,6 +290,7 @@
                     const db = firebase.firestore();
                     const cleanCart = JSON.parse(JSON.stringify(this.cart));
                     
+                    // SAVE ORDER FOR MANUFACTURER TO SEE
                     await db.collection('orders').add({
                         customerName: this.customerName, customerPhone: this.customerPhone, items: cleanCart, total: this.cartTotal,
                         partnerId: this.uid, manufacturerId: this.userData.parentAgency, status: 'New', date: new Date()
@@ -282,7 +299,7 @@
                     let msg = `*New Order*\nName: ${this.customerName}\nPhone: ${this.customerPhone}\nTotal: $${this.cartTotal}`;
                     const partnerPhone = (this.userData.phone || '').replace(/[^0-9]/g, '');
                     window.open(`https://wa.me/${partnerPhone}?text=${encodeURIComponent(msg)}`, '_blank');
-                    this.cart = []; alert("Order Sent!");
+                    this.cart = []; alert("Order Sent to Manufacturer!");
                 },
 
                 async saveProfile() {
@@ -305,12 +322,10 @@
                     this.chatInput = '';
                 },
 
-                // CRITICAL FIX: Update Agency Doc so Home Page sees changes
                 async submitReview() {
                     if(this.reviewRating===0) return alert("Rate stars");
                     const db = firebase.firestore();
                     const agencyRef = db.collection('agencies').doc(this.userData.parentAgency);
-                    
                     try {
                         await db.runTransaction(async (t) => {
                             const doc = await t.get(agencyRef);
@@ -318,33 +333,16 @@
                             const newCount = (data.reviewCount || 0) + 1;
                             const currentTotal = (data.avgRating || 0) * (data.reviewCount || 0);
                             const newAvg = (currentTotal + this.reviewRating) / newCount;
-
-                            // 1. Update Main Agency Doc (For Home Page Visibility)
                             t.update(agencyRef, {
-                                avgRating: newAvg,
-                                reviewCount: newCount,
-                                latestReview: {
-                                    text: this.reviewText,
-                                    rating: this.reviewRating,
-                                    author: this.userData.fullName || 'Partner'
-                                }
+                                avgRating: newAvg, reviewCount: newCount,
+                                latestReview: { text: this.reviewText, rating: this.reviewRating, author: this.userData.fullName || 'Partner' }
                             });
-
-                            // 2. Add to Subcollection (For Detailed View)
                             const reviewRef = agencyRef.collection('reviews').doc();
-                            t.set(reviewRef, {
-                                rating: this.reviewRating,
-                                comment: this.reviewText,
-                                partnerName: this.userData.fullName,
-                                date: new Date()
-                            });
+                            t.set(reviewRef, { rating: this.reviewRating, comment: this.reviewText, partnerName: this.userData.fullName, date: new Date() });
                         });
                         alert("Review Submitted & Published!");
                         this.reviewText = ''; this.reviewRating = 0;
-                    } catch(e) {
-                        console.error(e);
-                        alert("Error submitting review");
-                    }
+                    } catch(e) { console.error(e); alert("Error submitting review"); }
                 },
 
                 async reportIssue() {
@@ -356,7 +354,8 @@
                         });
                         alert("Reported.");
                     }
-                }
+                },
+                closeAlert(a) { this.systemAlerts = this.systemAlerts.filter(i => i !== a); }
             }
         }
     </script>
