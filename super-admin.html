@@ -3,11 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <title>Super Admin</title>
+    <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js -->
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <!-- Config -->
     <script src="firebase-config.js"></script>
     <style>[x-cloak] { display: none !important; }</style>
 </head>
@@ -25,7 +29,8 @@
                 <button @click="nav='directory'; loadDirectory()" :class="nav==='directory' ? 'bg-blue-600' : 'bg-gray-700'" class="px-4 py-2 rounded font-bold transition">
                     Network Directory
                 </button>
-                <button @click="auth.signOut()" class="bg-gray-800 border border-gray-600 px-4 py-2 rounded hover:bg-gray-700">Logout</button>
+                <!-- FIXED LOGOUT BUTTON -->
+                <button @click="handleLogout" class="bg-gray-800 border border-gray-600 px-4 py-2 rounded hover:bg-gray-700 text-red-400 font-bold">Logout</button>
             </div>
         </div>
 
@@ -77,7 +82,7 @@
                                     <p class="text-xs text-gray-500" x-text="d.clientPhone"></p>
                                 </td>
                                 <td class="p-4"><p class="text-red-400 font-mono" x-text="d.agencyId"></p></td>
-                                <td class="p-4"><p class="text-green-400 font-bold" x-text="'$' + d.amount"></p><p class="text-xs text-gray-500" x-text="new Date(d.date.seconds*1000).toLocaleDateString()"></p></td>
+                                <td class="p-4"><p class="text-green-400 font-bold" x-text="'$' + d.amount"></p><p class="text-xs text-gray-500" x-text="d.date ? new Date(d.date.seconds*1000).toLocaleDateString() : 'N/A'"></p></td>
                                 <td class="p-4 text-right space-x-2">
                                     <template x-if="filter === 'open'">
                                         <span>
@@ -202,46 +207,70 @@
                 composeOpen: false, composeMsg: '', composeTargetId: '', composeTargetName: '', composeRole: '',
 
                 init() {
-                    const db = firebase.firestore();
-                    db.collection('disputes').onSnapshot(snap => {
-                        this.disputes = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                    // 1. CHECK LOGIN
+                    firebase.auth().onAuthStateChanged(user => {
+                        if (user) {
+                            // 2. START LISTENER ONLY AFTER LOGIN
+                            const db = firebase.firestore();
+                            db.collection('disputes').onSnapshot(snap => {
+                                this.disputes = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                            });
+                        } else {
+                            window.location.href = 'index.html';
+                        }
                     });
                 },
 
-                get filteredDisputes() { return this.disputes.filter(d => d.status === this.filter); },
-
-                // --- DISPUTE ACTIONS (MANUFACTURER ID = AGENCY ID) ---
-                async updateStatus(dispute, newStatus) {
-                    const db = firebase.firestore();
-                    await db.collection('disputes').doc(dispute.id).update({ status: newStatus });
-                    
-                    const updateData = {};
-                    if (newStatus === 'warned') { updateData.warningStatus = true; updateData.blockedStatus = false; }
-                    if (newStatus === 'blocked') { updateData.warningStatus = true; updateData.blockedStatus = true; }
-                    if (newStatus === 'open') { updateData.warningStatus = false; updateData.blockedStatus = false; }
-                    
-                    // We update the 'agencies' collection (Manufacturers)
-                    await db.collection('agencies').doc(dispute.agencyId).update(updateData);
+                get filteredDisputes() {
+                    return this.disputes.filter(d => d.status === this.filter);
                 },
 
+                // FIXED LOGOUT
+                handleLogout() {
+                    firebase.auth().signOut().then(() => {
+                        window.location.href = 'index.html';
+                    });
+                },
+
+                // --- DISPUTE ACTIONS ---
+                async updateStatus(dispute, newStatus) {
+                    const db = firebase.firestore();
+                    try {
+                        await db.collection('disputes').doc(dispute.id).update({ status: newStatus });
+                        
+                        const updateData = {};
+                        if (newStatus === 'warned') { updateData.warningStatus = true; updateData.blockedStatus = false; }
+                        if (newStatus === 'blocked') { updateData.warningStatus = true; updateData.blockedStatus = true; }
+                        if (newStatus === 'open') { updateData.warningStatus = false; updateData.blockedStatus = false; }
+                        
+                        await db.collection('agencies').doc(dispute.agencyId).update(updateData);
+                    } catch (e) {
+                        alert("Error updating status: " + e.message);
+                    }
+                },
+
+                // --- GLOBAL BROADCAST ---
                 async sendBroadcast() {
                     if(!this.alertMsg) return;
                     const db = firebase.firestore();
-                    await db.collection('alerts').add({
-                        message: this.alertMsg,
-                        target: this.alertTarget, // 'all', 'agencies', 'clients'
-                        type: this.alertType,
-                        sender: 'Super Admin',
-                        createdAt: new Date()
-                    });
-                    this.alertMsg = ''; 
-                    alert("Broadcast Sent Successfully!");
+                    try {
+                        await db.collection('alerts').add({
+                            message: this.alertMsg,
+                            target: this.alertTarget, // 'all', 'agencies', 'clients'
+                            type: this.alertType,
+                            sender: 'Super Admin',
+                            createdAt: new Date()
+                        });
+                        this.alertMsg = ''; 
+                        alert("Broadcast Sent Successfully!");
+                    } catch (e) {
+                        alert("Error sending broadcast: " + e.message);
+                    }
                 },
 
                 // --- DIRECTORY LOGIC ---
                 async loadDirectory() {
                     const db = firebase.firestore();
-                    // Manufacturers are stored in 'agencies'
                     const snap = await db.collection('agencies').get();
                     this.allAgencies = snap.docs.map(d => ({id: d.id, ...d.data()}));
                 },
@@ -255,7 +284,6 @@
                     this.agencyClients = [];
 
                     const db = firebase.firestore();
-                    // Partners are stored in 'users'
                     const snap = await db.collection('users').where('parentAgency', '==', agencyId).get();
                     this.agencyClients = snap.docs.map(d => ({id: d.id, ...d.data()}));
                     this.clientsLoading = false;
@@ -273,15 +301,20 @@
                 async sendPrivateMessage() {
                     if (!this.composeMsg) return;
                     const db = firebase.firestore();
-                    await db.collection('alerts').add({
-                        message: this.composeMsg,
-                        target: this.composeTargetId,
-                        type: 'info',
-                        sender: 'Super Admin (Private)',
-                        createdAt: new Date()
-                    });
-                    this.composeOpen = false;
-                    alert("Private Message Sent!");
+                    try {
+                        // Writes to 'alerts' collection with specific target ID
+                        await db.collection('alerts').add({
+                            message: this.composeMsg,
+                            target: this.composeTargetId,
+                            type: 'info',
+                            sender: 'Super Admin (Private)',
+                            createdAt: new Date()
+                        });
+                        this.composeOpen = false;
+                        alert("Private Message Sent!");
+                    } catch (e) {
+                        alert("Error sending message: " + e.message);
+                    }
                 }
             }
         }
