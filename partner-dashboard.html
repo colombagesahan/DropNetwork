@@ -5,10 +5,12 @@
     <title>Partner Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
+    <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         [x-cloak] { display: none !important; }
@@ -52,6 +54,21 @@
             <!-- TAB: HOME -->
             <div x-show="tab==='home'">
                 <h1 class="text-2xl font-bold mb-6">Overview</h1>
+                
+                <!-- NEW: Manufacturer Details Card -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-blue-600 font-bold uppercase mb-1">Partnering With</p>
+                        <h2 class="text-2xl font-bold text-gray-800" x-text="agencyData.agencyName || 'Loading...'"></h2>
+                        <a :href="agencyData.promoLink" target="_blank" class="text-blue-600 hover:underline text-sm mt-1 inline-block">
+                            <i class="fas fa-external-link-alt mr-1"></i> Visit Manufacturer Website
+                        </a>
+                    </div>
+                    <div class="text-right">
+                        <span class="bg-blue-600 text-white text-xs px-3 py-1 rounded-full">Authorized Partner</span>
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-2 gap-6">
                     <div class="bg-white p-6 rounded shadow border-l-4 border-green-500">
                         <p class="text-gray-500">Unpaid Earnings</p>
@@ -99,21 +116,30 @@
                     <div x-show="myInventory.length === 0" class="p-4 text-center text-gray-400 text-sm">You haven't added any products yet. Import some below!</div>
                 </div>
                 
-                <!-- Import Products -->
+                <!-- Import Products (FIXED LOADING) -->
                 <div class="bg-gray-100 p-6 rounded-lg">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-lg">Import from Manufacturer Catalog</h3>
+                        <h3 class="font-bold text-lg">Import from <span x-text="agencyData.agencyName"></span></h3>
                         <select x-model="filterCategory" class="border p-2 rounded">
                             <option value="">All Categories</option>
                             <template x-for="cat in categories"><option :value="cat" x-text="cat"></option></template>
                         </select>
                     </div>
                     
-                    <div x-show="manufacturerCatalog.length === 0" class="text-center text-gray-500 py-10">
-                        <i class="fas fa-spinner fa-spin mb-2"></i><br>Loading catalog... (If empty, Manufacturer has no products)
+                    <!-- Loading Spinner -->
+                    <div x-show="catalogLoading" class="text-center py-10">
+                        <i class="fas fa-spinner fa-spin text-3xl text-blue-500 mb-2"></i>
+                        <p class="text-gray-500">Loading catalog...</p>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Empty State -->
+                    <div x-show="!catalogLoading && manufacturerCatalog.length === 0" class="text-center py-10 text-gray-500">
+                        <i class="fas fa-box-open text-3xl mb-2"></i>
+                        <p>Manufacturer has not added any products yet.</p>
+                    </div>
+
+                    <!-- Product Grid -->
+                    <div x-show="!catalogLoading && manufacturerCatalog.length > 0" class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <template x-for="p in filteredCatalog">
                             <div class="bg-white p-4 rounded shadow border border-gray-200">
                                 <div class="relative h-32 mb-2 bg-gray-50 flex items-center justify-center">
@@ -135,7 +161,7 @@
             <!-- TAB: LIVE WEBSITE PREVIEW -->
             <div x-show="tab==='website'" class="website-preview min-h-screen bg-white rounded-lg shadow-2xl border border-gray-300 overflow-hidden">
                 <header class="bg-blue-900 text-white p-4 flex justify-between items-center">
-                    <div class="font-bold text-xl"><span x-text="agencyName"></span> Store</div>
+                    <div class="font-bold text-xl"><span x-text="agencyData.agencyName"></span> Store</div>
                 </header>
                 <section class="text-center py-10 bg-blue-50">
                     <h1 class="text-3xl font-bold text-blue-900">Welcome to Our Store</h1>
@@ -164,7 +190,7 @@
                 </div>
             </div>
 
-            <!-- OTHER TABS (Chat, Rate, Profile) -->
+            <!-- OTHER TABS -->
             <div x-show="tab==='support'" class="h-[80vh] flex flex-col bg-white rounded shadow">
                 <div class="p-4 border-b font-bold bg-gray-50">Chat with Manufacturer</div>
                 <div class="flex-1 overflow-y-auto p-4 space-y-3" id="chatBox">
@@ -209,9 +235,14 @@
     <script>
         function partnerApp() {
             return {
-                tab: 'home', uid: null, userData: {}, agencyName: '',
+                tab: 'home', uid: null, userData: {}, 
+                // Manufacturer Info
+                agencyData: { agencyName: '', promoLink: '' },
+                
                 profileComplete: false, loading: true, profileForm: {},
                 manufacturerCatalog: [], myInventory: [], categories: [], filterCategory: '',
+                catalogLoading: true, // NEW: Loading state for catalog
+                
                 messages: [], chatInput: '', reviewRating: 0, reviewText: '',
                 cart: [], customerName: '', customerPhone: '',
 
@@ -219,7 +250,7 @@
                     auth.onAuthStateChanged(user => {
                         if(user) {
                             this.uid = user.uid;
-                            this.loadData();
+                            this.loadData(); // Starts the chain
                         } else window.location.href='index.html';
                     });
                 },
@@ -231,7 +262,6 @@
                 
                 get cartTotal() { return this.cart.reduce((sum, i) => sum + parseFloat(i.sellingPrice), 0); },
 
-                // FIX: Helper to handle both Old (string) and New (array) image formats
                 getImage(p) {
                     if (Array.isArray(p.images) && p.images.length > 0) return p.images[0];
                     if (p.image) return p.image;
@@ -240,32 +270,55 @@
 
                 async loadData() {
                     const db = firebase.firestore();
-                    const doc = await db.collection('users').doc(this.uid).get();
-                    if(doc.exists) {
-                        this.userData = doc.data();
-                        if(this.userData.phone && this.userData.fullName) {
-                            this.profileComplete = true; 
-                            this.profileForm = { ...this.userData }; 
-                            this.listenChat();
-                            this.loadCatalog(this.userData.parentAgency);
-                            this.loadMyInventory();
-                            // Get Agency Name
-                            const ag = await db.collection('agencies').doc(this.userData.parentAgency).get();
-                            if(ag.exists) this.agencyName = ag.data().agencyName;
-                        } else this.profileComplete = false;
-                    }
-                    this.loading = false;
+                    // Listen to User Profile
+                    db.collection('users').doc(this.uid).onSnapshot(doc => {
+                        if(doc.exists) {
+                            this.userData = doc.data();
+                            if(this.userData.phone && this.userData.fullName) {
+                                this.profileComplete = true; 
+                                this.profileForm = { ...this.userData };
+                                
+                                // Once we know the Parent Agency, start listeners
+                                if(this.userData.parentAgency) {
+                                    this.listenManufacturer(this.userData.parentAgency);
+                                    this.listenCatalog(this.userData.parentAgency);
+                                    this.listenChat();
+                                }
+                                this.listenMyInventory();
+                            } else this.profileComplete = false;
+                        }
+                        this.loading = false;
+                    });
                 },
 
-                async loadCatalog(agencyId) {
-                    const snap = await firebase.firestore().collection('agencies').doc(agencyId).collection('master_catalog').get();
-                    this.manufacturerCatalog = snap.docs.map(d => ({id: d.id, ...d.data()}));
-                    this.categories = [...new Set(this.manufacturerCatalog.map(p => p.category))];
+                // 1. Listen for Manufacturer Details (Name/Link)
+                listenManufacturer(agencyId) {
+                    firebase.firestore().collection('agencies').doc(agencyId).onSnapshot(doc => {
+                        if(doc.exists) {
+                            const data = doc.data();
+                            this.agencyData.agencyName = data.agencyName || "Manufacturer";
+                            // Construct Promo Link
+                            const baseUrl = window.location.href.split('/').slice(0,-1).join('/');
+                            this.agencyData.promoLink = `${baseUrl}/manufacturer-promo.html?id=${agencyId}`;
+                        }
+                    });
                 },
 
-                async loadMyInventory() {
-                    const snap = await firebase.firestore().collection('users').doc(this.uid).collection('products').get();
-                    this.myInventory = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                // 2. Listen for Catalog Updates (Realtime Stock/Products)
+                listenCatalog(agencyId) {
+                    this.catalogLoading = true;
+                    firebase.firestore().collection('agencies').doc(agencyId).collection('master_catalog').onSnapshot(snap => {
+                        this.manufacturerCatalog = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                        this.categories = [...new Set(this.manufacturerCatalog.map(p => p.category))];
+                        this.catalogLoading = false;
+                    });
+                },
+
+                // 3. Listen for My Inventory (Local Store)
+                listenMyInventory() {
+                    firebase.firestore().collection('users').doc(this.uid).collection('products').onSnapshot(snap => {
+                        this.myInventory = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                    });
                 },
 
                 isStockAvailable(originalId) {
@@ -279,20 +332,12 @@
 
                 async importProduct(p) {
                     if(this.myInventory.find(i => i.name === p.name)) return alert("Already added!");
-                    
-                    // Save with correct Image format
                     const img = this.getImage(p);
-                    
                     await firebase.firestore().collection('users').doc(this.uid).collection('products').add({
-                        name: p.name,
-                        basePrice: p.price,
-                        sellingPrice: p.price, 
-                        image: img, 
-                        originalId: p.id,
-                        category: p.category || 'General'
+                        name: p.name, basePrice: p.price, sellingPrice: p.price, 
+                        image: img, originalId: p.id, category: p.category || 'General'
                     });
-                    this.loadMyInventory();
-                    alert("Added to your store!");
+                    alert("Added!");
                 },
 
                 async updatePrice(p) {
@@ -305,11 +350,10 @@
                 async removeProduct(id) {
                     if(confirm("Remove?")) {
                         await firebase.firestore().collection('users').doc(this.uid).collection('products').doc(id).delete();
-                        this.loadMyInventory();
                     }
                 },
 
-                // CART LOGIC
+                // --- EXISTING FUNCTIONS ---
                 addToCart(p) { this.cart.push(p); },
                 async checkout() {
                     if(!this.customerName || !this.customerPhone) return alert("Fill Name/Phone");
@@ -324,14 +368,10 @@
                     let msg = `*New Order*\nName: ${this.customerName}\nPhone: ${this.customerPhone}\nItems:`;
                     this.cart.forEach(i => msg += `\n- ${i.name}: $${i.sellingPrice}`);
                     msg += `\nTotal: $${this.cartTotal}`;
-                    
                     const partnerPhone = this.userData.phone.replace(/[^0-9]/g, '');
                     window.open(`https://wa.me/${partnerPhone}?text=${encodeURIComponent(msg)}`, '_blank');
-                    
                     this.cart = []; alert("Order Sent!");
                 },
-
-                // Existing Tools
                 async saveProfile() {
                     if(!this.profileForm.phone) return alert("Fill details");
                     await firebase.firestore().collection('users').doc(this.uid).update(this.profileForm);
@@ -359,7 +399,7 @@
                     alert("Review Submitted!");
                 },
                 async reportIssue() {
-                    if(confirm("Report to Super Admin?")) {
+                    if(confirm("Report to Admin?")) {
                         await firebase.firestore().collection('disputes').add({
                             agencyId: this.userData.parentAgency, clientEmail: this.userData.email,
                             clientName: this.userData.fullName, clientPhone: this.userData.phone,
