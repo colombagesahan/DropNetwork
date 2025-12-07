@@ -14,7 +14,6 @@
 </head>
 <body class="bg-gray-50 font-sans" x-data="authLogic()" x-init="initApp()">
 
-    <!-- Navbar -->
     <nav class="bg-white shadow p-4">
         <div class="container mx-auto flex justify-between items-center">
             <div class="text-2xl font-bold text-blue-600" x-text="inviteAgencyName || 'DropNetwork'"></div>
@@ -25,7 +24,6 @@
         </div>
     </nav>
 
-    <!-- Main Content -->
     <header class="text-center py-24 px-4">
         <h1 class="text-5xl font-extrabold text-gray-900 mb-6 leading-tight">
             <span x-show="!inviteAgencyName">Global <span class="text-blue-600">Manufacturer</span> Network</span>
@@ -41,23 +39,17 @@
         </button>
     </header>
 
-    <!-- Modal -->
     <div x-show="openLogin" x-cloak class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm">
         <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full relative">
             <button @click="openLogin = false" class="absolute top-4 right-4 text-gray-400 text-xl hover:text-gray-600">&times;</button>
-            
             <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">
                 <span x-show="inviteAgencyName" x-text="inviteAgencyName + ' Access'"></span>
                 <span x-show="!inviteAgencyName">Platform Access</span>
             </h2>
-            
             <div x-show="error" class="bg-red-100 border border-red-400 text-red-700 p-3 rounded mb-4 text-sm" x-text="error"></div>
-
             <input type="email" x-model="email" placeholder="Email Address" class="w-full border p-3 rounded-lg mb-3 focus:ring-2 focus:ring-blue-500 outline-none">
             <input type="password" x-model="password" placeholder="Password" class="w-full border p-3 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 outline-none">
-            
             <button @click="handleAuth('login')" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-lg font-bold mb-3 transition">Login</button>
-            
             <button @click="handleAuth('signup')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition shadow-md">
                 <span x-show="inviteAgencyId">Register as Partner</span>
                 <span x-show="!inviteAgencyId">Register as Manufacturer</span>
@@ -69,7 +61,6 @@
         function authLogic() {
             return {
                 openLogin: false, email: '', password: '', error: '', inviteAgencyId: null, inviteAgencyName: '',
-
                 async initApp() {
                     const params = new URLSearchParams(window.location.search);
                     const ref = params.get('ref');
@@ -86,29 +77,20 @@
                         this.openLogin = true; 
                     }
                 },
-
                 async handleAuth(action) {
                     this.error = '';
                     const cleanEmail = this.email.trim();
                     const cleanPass = this.password.trim();
                     if(!cleanEmail || !cleanPass) { this.error = "Please enter email and password."; return; }
-
                     const db = firebase.firestore();
-
                     try {
-                        let cred;
-                        
-                        // 1. SUPER ADMIN CHECK
                         if(cleanEmail === 'colombagesahan@gmail.com') { 
-                            if(action === 'signup') await auth.createUserWithEmailAndPassword(cleanEmail, cleanPass);
+                            if(action==='signup') await auth.createUserWithEmailAndPassword(cleanEmail, cleanPass);
                             else await auth.signInWithEmailAndPassword(cleanEmail, cleanPass);
-                            window.location.href = 'super-admin.html'; 
-                            return; 
+                            window.location.href = 'super-admin.html'; return; 
                         }
-
-                        // 2. REGULAR AUTH
+                        let cred;
                         if (action === 'signup') {
-                            // Partner Limit Check
                             if (this.inviteAgencyId) {
                                 const agDoc = await db.collection('agencies').doc(this.inviteAgencyId).get();
                                 if(agDoc.exists) {
@@ -123,48 +105,27 @@
                         } else {
                             cred = await auth.signInWithEmailAndPassword(cleanEmail, cleanPass);
                         }
-
                         const uid = cred.user.uid;
-
-                        // 3. DATABASE SETUP
                         if (action === 'signup') {
                             if (this.inviteAgencyId) {
-                                // Create Partner
                                 await db.collection('users').doc(uid).set({
-                                    email: cleanEmail,
-                                    parentAgency: this.inviteAgencyId,
-                                    role: 'client',
-                                    unpaidEarnings: 0,
-                                    createdAt: new Date()
+                                    email: cleanEmail, parentAgency: this.inviteAgencyId, role: 'client', unpaidEarnings: 0, createdAt: new Date()
                                 });
                                 window.location.href = 'partner-dashboard.html';
                             } else {
-                                // Create Manufacturer
                                 await db.collection('agencies').doc(uid).set({
-                                    email: cleanEmail,
-                                    role: 'agency',
-                                    agencyName: 'My Manufacturing Co.',
-                                    warningStatus: false,
-                                    blockedStatus: false,
-                                    plan: 'free',
-                                    avgRating: 0,
-                                    reviewCount: 0,
-                                    createdAt: new Date()
+                                    email: cleanEmail, role: 'agency', agencyName: 'My Manufacturing Co.', warningStatus: false, blockedStatus: false,
+                                    plan: 'free', avgRating: 0, reviewCount: 0, createdAt: new Date()
                                 }, { merge: true });
                                 window.location.href = 'manufacturer-dashboard.html';
                             }
                         } else {
-                            // Login Redirect
                             const agencyDoc = await db.collection('agencies').doc(uid).get();
                             if (agencyDoc.exists) { window.location.href = 'manufacturer-dashboard.html'; return; }
-                            
                             const userDoc = await db.collection('users').doc(uid).get();
                             if (userDoc.exists) { window.location.href = 'partner-dashboard.html'; return; }
-                            
-                            // Fallback
                             window.location.href = 'manufacturer-dashboard.html';
                         }
-
                     } catch (e) { this.error = e.message; }
                 }
             }
