@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - DropNetwork</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+</head>
+<body class="bg-gray-50 font-sans" x-data="authLogic()" x-init="initApp()">
+
+    <!-- Navbar -->
+    <nav class="bg-white shadow p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="text-2xl font-bold text-blue-600" x-text="inviteAgencyName || 'DropNetwork'"></div>
+            <div class="flex gap-4 items-center">
+                <a href="home.html" class="text-gray-500 hover:text-blue-600 font-bold text-sm">Home</a>
+                <button @click="openLogin=true" class="bg-blue-600 text-white px-6 py-2 rounded-full font-bold shadow hover:bg-blue-700">Login</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <header class="text-center py-24 px-4">
+        
+        <!-- Welcome Message -->
+        <h1 class="text-5xl font-extrabold text-gray-900 mb-6 leading-tight">
+            <span x-show="!inviteAgencyName">Global <span class="text-blue-600">Manufacturer</span> Network</span>
+            <span x-show="inviteAgencyName">Partner with <span x-text="inviteAgencyName" class="text-blue-600"></span></span>
+        </h1>
+        
+        <p class="text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
+            <span x-show="!inviteAgencyName">Manufacturers: List products & manage sales. <br> Partners: Sell products & earn commissions.</span>
+            <span x-show="inviteAgencyName">Create your Marketing Partner account to start selling products from this manufacturer.</span>
+        </p>
+        
+        <button @click="openLogin=true" class="bg-gray-900 text-white px-10 py-4 rounded-lg text-lg font-bold shadow-xl hover:bg-gray-800 transform hover:scale-105 transition">
+            <span x-show="inviteAgencyId">Join as Marketing Partner</span>
+            <span x-show="!inviteAgencyId">Create Manufacturer Account</span>
+        </button>
+    </header>
+
+    <!-- Modal -->
+    <div x-show="openLogin" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm" style="display: none;">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full relative">
+            <button @click="openLogin = false" class="absolute top-4 right-4 text-gray-400 text-xl hover:text-gray-600">&times;</button>
+            
+            <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">
+                <span x-show="inviteAgencyName" x-text="inviteAgencyName + ' Access'"></span>
+                <span x-show="!inviteAgencyName">Platform Access</span>
+            </h2>
+            
+            <div x-show="error" class="bg-red-100 border border-red-400 text-red-700 p-3 rounded mb-4 text-sm" x-text="error"></div>
+
+            <input type="email" x-model="email" placeholder="Email Address" class="w-full border p-3 rounded-lg mb-3 focus:ring-2 focus:ring-blue-500 outline-none">
+            <input type="password" x-model="password" placeholder="Password" class="w-full border p-3 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 outline-none">
+            
+            <button @click="handleAuth('login')" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-lg font-bold mb-3 transition">Login</button>
+            
+            <button @click="handleAuth('signup')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition shadow-md">
+                <span x-show="inviteAgencyId">Register as Partner</span>
+                <span x-show="!inviteAgencyId">Register as Manufacturer</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function authLogic() {
+            return {
+                openLogin: false, email: '', password: '', error: '', inviteAgencyId: null, inviteAgencyName: '',
+
+                async initApp() {
+                    const params = new URLSearchParams(window.location.search);
+                    const ref = params.get('ref');
+                    if (ref) {
+                        this.inviteAgencyId = ref;
+                        try {
+                            const db = firebase.firestore();
+                            const doc = await db.collection('agencies').doc(ref).get();
+                            if(doc.exists) {
+                                this.inviteAgencyName = doc.data().agencyName || "Manufacturer";
+                                document.title = "Join " + this.inviteAgencyName; 
+                            }
+                        } catch(e) { console.error(e); }
+                        this.openLogin = true; 
+                    }
+                },
+
+                async handleAuth(action) {
+                    this.error = '';
+                    const cleanEmail = this.email.trim();
+                    const cleanPass = this.password.trim();
+
+                    if(!cleanEmail || !cleanPass) { this.error = "Please enter email and password."; return; }
+
+                    const db = firebase.firestore();
+
+                    try {
+                        if (action === 'signup') {
+                            
+                            // PARTNER LIMIT CHECK (For Manufacturer Free Plan)
+                            if (this.inviteAgencyId) {
+                                const agDoc = await db.collection('agencies').doc(this.inviteAgencyId).get();
+                                const agData = agDoc.data();
+                                const partnersSnap = await db.collection('users').where('parentAgency', '==', this.inviteAgencyId).get();
+                                
+                                // Logic: If plan != unlimited AND partners >= 10 -> Block
+                                if (agData.plan !== 'unlimited' && partnersSnap.size >= 10) {
+                                    this.error = "This Manufacturer has reached their Partner limit. They must upgrade.";
+                                    return;
+                                }
+                            }
+
+                            const cred = await auth.createUserWithEmailAndPassword(cleanEmail, cleanPass);
+                            
+                            if (this.inviteAgencyId) {
+                                // REGISTER PARTNER (Formerly Client)
+                                await db.collection('users').doc(cred.user.uid).set({
+                                    email: cleanEmail,
+                                    parentAgency: this.inviteAgencyId,
+                                    role: 'client',
+                                    unpaidEarnings: 0,
+                                    createdAt: new Date()
+                                });
+                                window.location.href = 'partner-dashboard.html';
+                            } else {
+                                // REGISTER MANUFACTURER (Formerly Agency)
+                                await db.collection('agencies').doc(cred.user.uid).set({
+                                    email: cleanEmail,
+                                    role: 'agency',
+                                    agencyName: 'My Manufacturing Co.',
+                                    warningStatus: false,
+                                    blockedStatus: false,
+                                    plan: 'free',
+                                    avgRating: 0,
+                                    reviewCount: 0,
+                                    createdAt: new Date()
+                                }, { merge: true });
+                                window.location.href = 'manufacturer-dashboard.html';
+                            }
+                        } else {
+                            // LOGIN
+                            const cred = await auth.signInWithEmailAndPassword(cleanEmail, cleanPass);
+                            const uid = cred.user.uid;
+                            
+                            if(cleanEmail === 'colombagesahan@gmail.com') { window.location.href = 'super-admin.html'; return; }
+
+                            // Redirect based on role
+                            const agencyDoc = await db.collection('agencies').doc(uid).get();
+                            if (agencyDoc.exists) { window.location.href = 'manufacturer-dashboard.html'; return; }
+                            
+                            const userDoc = await db.collection('users').doc(uid).get();
+                            if (userDoc.exists) { window.location.href = 'partner-dashboard.html'; return; }
+                        }
+                    } catch (e) { this.error = e.message; }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
