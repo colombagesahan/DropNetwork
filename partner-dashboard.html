@@ -5,17 +5,12 @@
     <title>Partner Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
-    <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        [x-cloak] { display: none !important; }
-        .website-preview { font-family: sans-serif; background-color: #f1f4f8; }
-    </style>
+    <style>[x-cloak] { display: none !important; } .website-preview { font-family: sans-serif; background-color: #f1f4f8; }</style>
 </head>
 <body class="bg-gray-50 font-sans" x-data="partnerApp()">
 
@@ -51,11 +46,9 @@
 
         <div class="flex-1 overflow-y-auto p-8 relative">
             
-            <!-- TAB: HOME -->
+            <!-- HOME -->
             <div x-show="tab==='home'">
                 <h1 class="text-2xl font-bold mb-6">Overview</h1>
-                
-                <!-- NEW: Manufacturer Details Card -->
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8 flex items-center justify-between">
                     <div>
                         <p class="text-xs text-blue-600 font-bold uppercase mb-1">Partnering With</p>
@@ -64,11 +57,7 @@
                             <i class="fas fa-external-link-alt mr-1"></i> Visit Manufacturer Website
                         </a>
                     </div>
-                    <div class="text-right">
-                        <span class="bg-blue-600 text-white text-xs px-3 py-1 rounded-full">Authorized Partner</span>
-                    </div>
                 </div>
-
                 <div class="grid grid-cols-2 gap-6">
                     <div class="bg-white p-6 rounded shadow border-l-4 border-green-500">
                         <p class="text-gray-500">Unpaid Earnings</p>
@@ -81,11 +70,9 @@
                 </div>
             </div>
 
-            <!-- TAB: PRODUCTS -->
+            <!-- PRODUCTS -->
             <div x-show="tab==='products'">
                 <h2 class="text-2xl font-bold mb-6">Manage Inventory</h2>
-                
-                <!-- My Products List -->
                 <div class="bg-white rounded shadow overflow-hidden mb-8">
                     <div class="p-4 bg-gray-50 border-b font-bold">Products on Your Website</div>
                     <table class="w-full text-left">
@@ -98,10 +85,7 @@
                                         <span x-text="p.name"></span>
                                     </td>
                                     <td class="p-4">
-                                        <span class="px-2 py-1 rounded text-xs font-bold text-white"
-                                              :class="isStockAvailable(p.originalId) ? 'bg-green-500' : 'bg-red-500'"
-                                              x-text="getStockStatus(p.originalId)">
-                                        </span>
+                                        <span class="px-2 py-1 rounded text-xs font-bold text-white" :class="isStockAvailable(p.originalId) ? 'bg-green-500' : 'bg-red-500'" x-text="getStockStatus(p.originalId)"></span>
                                     </td>
                                     <td class="p-4 text-gray-500" x-text="'$' + p.basePrice"></td>
                                     <td class="p-4"><input type="number" x-model="p.sellingPrice" class="border p-1 w-24 rounded"></td>
@@ -113,44 +97,19 @@
                             </template>
                         </tbody>
                     </table>
-                    <div x-show="myInventory.length === 0" class="p-4 text-center text-gray-400 text-sm">You haven't added any products yet. Import some below!</div>
                 </div>
-                
-                <!-- Import Products (FIXED LOADING) -->
                 <div class="bg-gray-100 p-6 rounded-lg">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="font-bold text-lg">Import from <span x-text="agencyData.agencyName"></span></h3>
-                        <select x-model="filterCategory" class="border p-2 rounded">
-                            <option value="">All Categories</option>
-                            <template x-for="cat in categories"><option :value="cat" x-text="cat"></option></template>
-                        </select>
+                        <select x-model="filterCategory" class="border p-2 rounded"><option value="">All Categories</option><template x-for="cat in categories"><option :value="cat" x-text="cat"></option></template></select>
                     </div>
-                    
-                    <!-- Loading Spinner -->
-                    <div x-show="catalogLoading" class="text-center py-10">
-                        <i class="fas fa-spinner fa-spin text-3xl text-blue-500 mb-2"></i>
-                        <p class="text-gray-500">Loading catalog...</p>
-                    </div>
-
-                    <!-- Empty State -->
-                    <div x-show="!catalogLoading && manufacturerCatalog.length === 0" class="text-center py-10 text-gray-500">
-                        <i class="fas fa-box-open text-3xl mb-2"></i>
-                        <p>Manufacturer has not added any products yet.</p>
-                    </div>
-
-                    <!-- Product Grid -->
+                    <div x-show="catalogLoading" class="text-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-blue-500"></i></div>
                     <div x-show="!catalogLoading && manufacturerCatalog.length > 0" class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <template x-for="p in filteredCatalog">
                             <div class="bg-white p-4 rounded shadow border border-gray-200">
-                                <div class="relative h-32 mb-2 bg-gray-50 flex items-center justify-center">
-                                    <img :src="getImage(p)" class="w-full h-full object-contain">
-                                    <span class="absolute top-0 right-0 bg-gray-800 text-white text-xs px-2 py-1 rounded" x-text="p.category"></span>
-                                </div>
+                                <img :src="getImage(p)" class="h-32 w-full object-contain mb-2">
                                 <h4 class="font-bold text-sm truncate" x-text="p.name"></h4>
-                                <p class="text-xs text-gray-500 mb-2">Cost: $<span x-text="p.price"></span> | Stock: <span x-text="p.stock"></span></p>
-                                <div class="flex gap-2">
-                                    <a :href="p.videoLink" target="_blank" x-show="p.videoLink" class="text-red-600 text-xs underline">Watch Video</a>
-                                </div>
+                                <p class="text-xs text-gray-500 mb-2">Cost: $<span x-text="p.price"></span></p>
                                 <button @click="importProduct(p)" class="w-full mt-2 bg-green-600 text-white py-1 rounded text-sm hover:bg-green-700">Add to Store</button>
                             </div>
                         </template>
@@ -158,7 +117,7 @@
                 </div>
             </div>
 
-            <!-- TAB: LIVE WEBSITE PREVIEW -->
+            <!-- WEBSITE -->
             <div x-show="tab==='website'" class="website-preview min-h-screen bg-white rounded-lg shadow-2xl border border-gray-300 overflow-hidden">
                 <header class="bg-blue-900 text-white p-4 flex justify-between items-center">
                     <div class="font-bold text-xl"><span x-text="agencyData.agencyName"></span> Store</div>
@@ -179,7 +138,6 @@
                         </template>
                     </div>
                 </section>
-                <!-- Simple Cart for Website -->
                 <div x-show="cart.length > 0" class="fixed bottom-4 right-4 bg-white p-4 shadow-xl border rounded-lg w-72 z-50">
                     <h3 class="font-bold border-b pb-2">Your Cart</h3>
                     <template x-for="i in cart"><div class="text-sm flex justify-between my-1"><span x-text="i.name"></span><span x-text="'$'+i.sellingPrice"></span></div></template>
@@ -190,22 +148,17 @@
                 </div>
             </div>
 
-            <!-- OTHER TABS -->
+            <!-- CHAT & RATE -->
             <div x-show="tab==='support'" class="h-[80vh] flex flex-col bg-white rounded shadow">
                 <div class="p-4 border-b font-bold bg-gray-50">Chat with Manufacturer</div>
                 <div class="flex-1 overflow-y-auto p-4 space-y-3" id="chatBox">
                     <template x-for="m in messages">
                         <div class="flex" :class="m.senderId === uid ? 'justify-end' : 'justify-start'">
-                            <div class="px-4 py-2 rounded-lg max-w-xs text-sm" :class="m.senderId === uid ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'">
-                                <p x-text="m.text"></p>
-                            </div>
+                            <div class="px-4 py-2 rounded-lg max-w-xs text-sm" :class="m.senderId === uid ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'"><p x-text="m.text"></p></div>
                         </div>
                     </template>
                 </div>
-                <div class="p-4 border-t flex gap-2">
-                    <input x-model="chatInput" @keyup.enter="sendChat" class="flex-1 border p-2 rounded" placeholder="Message...">
-                    <button @click="sendChat" class="bg-blue-600 text-white px-4 rounded">Send</button>
-                </div>
+                <div class="p-4 border-t flex gap-2"><input x-model="chatInput" class="flex-1 border p-2 rounded"><button @click="sendChat" class="bg-blue-600 text-white px-4 rounded">Send</button></div>
             </div>
 
             <div x-show="tab==='rate'">
@@ -219,66 +172,43 @@
                 </div>
             </div>
 
+            <!-- PROFILE -->
             <div x-show="tab==='profile'">
                 <h2 class="text-2xl font-bold mb-6">Profile</h2>
                 <div class="bg-white p-6 rounded shadow max-w-lg space-y-4">
                     <input x-model="profileForm.fullName" class="w-full border p-2 rounded">
                     <input x-model="profileForm.phone" class="w-full border p-2 rounded">
-                    <input x-model="profileForm.address" class="w-full border p-2 rounded">
                     <button @click="saveProfile" class="bg-green-600 text-white px-6 py-2 rounded">Update</button>
                 </div>
             </div>
-
         </div>
     </div>
 
     <script>
         function partnerApp() {
             return {
-                tab: 'home', uid: null, userData: {}, 
-                // Manufacturer Info
-                agencyData: { agencyName: '', promoLink: '' },
-                
+                tab: 'home', uid: null, userData: {}, agencyData: { agencyName: '', promoLink: '' },
                 profileComplete: false, loading: true, profileForm: {},
-                manufacturerCatalog: [], myInventory: [], categories: [], filterCategory: '',
-                catalogLoading: true, // NEW: Loading state for catalog
-                
-                messages: [], chatInput: '', reviewRating: 0, reviewText: '',
-                cart: [], customerName: '', customerPhone: '',
+                manufacturerCatalog: [], myInventory: [], categories: [], filterCategory: '', catalogLoading: true,
+                messages: [], chatInput: '', reviewRating: 0, reviewText: '', cart: [], customerName: '', customerPhone: '',
 
                 init() {
                     auth.onAuthStateChanged(user => {
-                        if(user) {
-                            this.uid = user.uid;
-                            this.loadData(); // Starts the chain
-                        } else window.location.href='index.html';
+                        if(user) { this.uid = user.uid; this.loadData(); } else window.location.href='index.html';
                     });
                 },
 
-                get filteredCatalog() {
-                    if(!this.filterCategory) return this.manufacturerCatalog;
-                    return this.manufacturerCatalog.filter(p => p.category === this.filterCategory);
-                },
-                
+                get filteredCatalog() { return !this.filterCategory ? this.manufacturerCatalog : this.manufacturerCatalog.filter(p => p.category === this.filterCategory); },
                 get cartTotal() { return this.cart.reduce((sum, i) => sum + parseFloat(i.sellingPrice), 0); },
-
-                getImage(p) {
-                    if (Array.isArray(p.images) && p.images.length > 0) return p.images[0];
-                    if (p.image) return p.image;
-                    return 'https://via.placeholder.com/150';
-                },
+                getImage(p) { return (Array.isArray(p.images) && p.images.length > 0) ? p.images[0] : (p.image || 'https://via.placeholder.com/150'); },
 
                 async loadData() {
                     const db = firebase.firestore();
-                    // Listen to User Profile
                     db.collection('users').doc(this.uid).onSnapshot(doc => {
                         if(doc.exists) {
                             this.userData = doc.data();
                             if(this.userData.phone && this.userData.fullName) {
-                                this.profileComplete = true; 
-                                this.profileForm = { ...this.userData };
-                                
-                                // Once we know the Parent Agency, start listeners
+                                this.profileComplete = true; this.profileForm = { ...this.userData };
                                 if(this.userData.parentAgency) {
                                     this.listenManufacturer(this.userData.parentAgency);
                                     this.listenCatalog(this.userData.parentAgency);
@@ -291,113 +221,132 @@
                     });
                 },
 
-                // 1. Listen for Manufacturer Details (Name/Link)
                 listenManufacturer(agencyId) {
                     firebase.firestore().collection('agencies').doc(agencyId).onSnapshot(doc => {
                         if(doc.exists) {
                             const data = doc.data();
-                            this.agencyData.agencyName = data.agencyName || "Manufacturer";
-                            // Construct Promo Link
-                            const baseUrl = window.location.href.split('/').slice(0,-1).join('/');
-                            this.agencyData.promoLink = `${baseUrl}/manufacturer-promo.html?id=${agencyId}`;
+                            this.agencyData = { ...data, promoLink: window.location.href.split('/').slice(0,-1).join('/') + `/manufacturer-promo.html?id=${agencyId}` };
                         }
                     });
                 },
 
-                // 2. Listen for Catalog Updates (Realtime Stock/Products)
                 listenCatalog(agencyId) {
-                    this.catalogLoading = true;
                     firebase.firestore().collection('agencies').doc(agencyId).collection('master_catalog').onSnapshot(snap => {
                         this.manufacturerCatalog = snap.docs.map(d => ({id: d.id, ...d.data()}));
-                        this.categories = [...new Set(this.manufacturerCatalog.map(p => p.category))];
+                        this.categories = [...new Set(this.manufacturerCatalog.map(p => p.category).filter(Boolean))];
                         this.catalogLoading = false;
                     });
                 },
 
-                // 3. Listen for My Inventory (Local Store)
                 listenMyInventory() {
                     firebase.firestore().collection('users').doc(this.uid).collection('products').onSnapshot(snap => {
                         this.myInventory = snap.docs.map(d => ({id: d.id, ...d.data()}));
                     });
                 },
 
-                isStockAvailable(originalId) {
-                    const p = this.manufacturerCatalog.find(i => i.id === originalId);
-                    return p && p.stock > 0;
-                },
-                getStockStatus(originalId) {
-                    const p = this.manufacturerCatalog.find(i => i.id === originalId);
-                    return (p && p.stock > 0) ? 'In Stock ('+p.stock+')' : 'Out of Stock';
-                },
+                isStockAvailable(originalId) { const p = this.manufacturerCatalog.find(i => i.id === originalId); return p && p.stock > 0; },
+                getStockStatus(originalId) { const p = this.manufacturerCatalog.find(i => i.id === originalId); return (p && p.stock > 0) ? 'In Stock ('+p.stock+')' : 'Out of Stock'; },
 
                 async importProduct(p) {
                     if(this.myInventory.find(i => i.name === p.name)) return alert("Already added!");
                     const img = this.getImage(p);
+                    // Sanitize proxy
                     await firebase.firestore().collection('users').doc(this.uid).collection('products').add({
-                        name: p.name, basePrice: p.price, sellingPrice: p.price, 
-                        image: img, originalId: p.id, category: p.category || 'General'
+                        name: p.name, basePrice: p.price, sellingPrice: p.price, image: img, originalId: p.id, category: p.category || 'General'
                     });
                     alert("Added!");
                 },
 
                 async updatePrice(p) {
-                    await firebase.firestore().collection('users').doc(this.uid).collection('products').doc(p.id).update({
-                        sellingPrice: p.sellingPrice
-                    });
+                    await firebase.firestore().collection('users').doc(this.uid).collection('products').doc(p.id).update({ sellingPrice: p.sellingPrice });
                     alert("Price Updated!");
                 },
 
                 async removeProduct(id) {
-                    if(confirm("Remove?")) {
-                        await firebase.firestore().collection('users').doc(this.uid).collection('products').doc(id).delete();
-                    }
+                    if(confirm("Remove?")) await firebase.firestore().collection('users').doc(this.uid).collection('products').doc(id).delete();
                 },
 
-                // --- EXISTING FUNCTIONS ---
-                addToCart(p) { this.cart.push(p); },
+                addToCart(p) { this.cart.push(JSON.parse(JSON.stringify(p))); },
+
                 async checkout() {
                     if(!this.customerName || !this.customerPhone) return alert("Fill Name/Phone");
+                    if(this.cart.length === 0) return alert("Cart empty");
                     const db = firebase.firestore();
+                    const cleanCart = JSON.parse(JSON.stringify(this.cart));
+                    
                     await db.collection('orders').add({
-                        customerName: this.customerName, customerPhone: this.customerPhone,
-                        items: this.cart, total: this.cartTotal,
-                        partnerId: this.uid, manufacturerId: this.userData.parentAgency,
-                        status: 'New', date: new Date()
+                        customerName: this.customerName, customerPhone: this.customerPhone, items: cleanCart, total: this.cartTotal,
+                        partnerId: this.uid, manufacturerId: this.userData.parentAgency, status: 'New', date: new Date()
                     });
                     
-                    let msg = `*New Order*\nName: ${this.customerName}\nPhone: ${this.customerPhone}\nItems:`;
-                    this.cart.forEach(i => msg += `\n- ${i.name}: $${i.sellingPrice}`);
-                    msg += `\nTotal: $${this.cartTotal}`;
-                    const partnerPhone = this.userData.phone.replace(/[^0-9]/g, '');
+                    let msg = `*New Order*\nName: ${this.customerName}\nPhone: ${this.customerPhone}\nTotal: $${this.cartTotal}`;
+                    const partnerPhone = (this.userData.phone || '').replace(/[^0-9]/g, '');
                     window.open(`https://wa.me/${partnerPhone}?text=${encodeURIComponent(msg)}`, '_blank');
                     this.cart = []; alert("Order Sent!");
                 },
+
                 async saveProfile() {
                     if(!this.profileForm.phone) return alert("Fill details");
-                    await firebase.firestore().collection('users').doc(this.uid).update(this.profileForm);
+                    await firebase.firestore().collection('users').doc(this.uid).update({...this.profileForm});
                     this.profileComplete = true; alert("Saved!");
                 },
+
                 listenChat() {
                     firebase.firestore().collection('messages').orderBy('timestamp').onSnapshot(snap => {
                         const all = snap.docs.map(d => d.data());
                         this.messages = all.filter(m => m.senderId === this.uid || m.receiverId === this.uid);
-                        setTimeout(() => { document.getElementById('chatBox').scrollTop = 9999; }, 100);
+                        setTimeout(() => { const b = document.getElementById('chatBox'); if(b) b.scrollTop = 9999; }, 100);
                     });
                 },
+
                 async sendChat() {
                     if(!this.chatInput) return;
-                    await firebase.firestore().collection('messages').add({
-                        senderId: this.uid, receiverId: this.userData.parentAgency, text: this.chatInput, timestamp: new Date()
-                    });
+                    await firebase.firestore().collection('messages').add({ senderId: this.uid, receiverId: this.userData.parentAgency, text: this.chatInput, timestamp: new Date() });
                     this.chatInput = '';
                 },
+
+                // CRITICAL FIX: Update Agency Doc so Home Page sees changes
                 async submitReview() {
                     if(this.reviewRating===0) return alert("Rate stars");
-                    await firebase.firestore().collection('agencies').doc(this.userData.parentAgency).collection('reviews').add({
-                        rating: this.reviewRating, comment: this.reviewText, partnerName: this.userData.fullName, date: new Date()
-                    });
-                    alert("Review Submitted!");
+                    const db = firebase.firestore();
+                    const agencyRef = db.collection('agencies').doc(this.userData.parentAgency);
+                    
+                    try {
+                        await db.runTransaction(async (t) => {
+                            const doc = await t.get(agencyRef);
+                            const data = doc.data();
+                            const newCount = (data.reviewCount || 0) + 1;
+                            const currentTotal = (data.avgRating || 0) * (data.reviewCount || 0);
+                            const newAvg = (currentTotal + this.reviewRating) / newCount;
+
+                            // 1. Update Main Agency Doc (For Home Page Visibility)
+                            t.update(agencyRef, {
+                                avgRating: newAvg,
+                                reviewCount: newCount,
+                                latestReview: {
+                                    text: this.reviewText,
+                                    rating: this.reviewRating,
+                                    author: this.userData.fullName || 'Partner'
+                                }
+                            });
+
+                            // 2. Add to Subcollection (For Detailed View)
+                            const reviewRef = agencyRef.collection('reviews').doc();
+                            t.set(reviewRef, {
+                                rating: this.reviewRating,
+                                comment: this.reviewText,
+                                partnerName: this.userData.fullName,
+                                date: new Date()
+                            });
+                        });
+                        alert("Review Submitted & Published!");
+                        this.reviewText = ''; this.reviewRating = 0;
+                    } catch(e) {
+                        console.error(e);
+                        alert("Error submitting review");
+                    }
                 },
+
                 async reportIssue() {
                     if(confirm("Report to Admin?")) {
                         await firebase.firestore().collection('disputes').add({
