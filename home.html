@@ -7,12 +7,10 @@
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- FIX: Included Auth Compat to prevent config crash -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
-    <style>[x-cloak] { display: none !important; }</style>
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans" x-data="homeApp()">
 
@@ -61,17 +59,14 @@
             <p class="text-gray-600 max-w-2xl mx-auto">Browse top-rated manufacturers, read reviews from other partners, and join their network to start selling.</p>
         </div>
 
-        <!-- Loading State -->
         <div x-show="loading" class="text-center py-20">
             <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-600 mx-auto"></div>
             <p class="mt-4 text-gray-500">Loading directory...</p>
         </div>
 
-        <!-- Grid -->
         <div x-show="!loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <template x-for="m in manufacturers">
                 <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition border border-gray-100 flex flex-col h-full group">
-                    <!-- Card Header -->
                     <div class="h-32 bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center text-white relative">
                         <i class="fas fa-industry text-5xl opacity-30 group-hover:scale-110 transition"></i>
                         <div class="absolute bottom-2 right-2 bg-black/30 px-2 py-1 rounded text-xs">
@@ -79,13 +74,11 @@
                         </div>
                     </div>
                     
-                    <!-- Card Body -->
                     <div class="p-6 flex-1 flex flex-col">
                         <div class="flex justify-between items-start mb-2">
                             <h3 class="font-bold text-lg text-gray-800 line-clamp-1" x-text="m.agencyName || 'Manufacturer'"></h3>
                         </div>
                         
-                        <!-- Ratings -->
                         <div class="flex items-center gap-2 mb-4">
                             <div class="flex text-yellow-400 text-sm">
                                 <template x-for="i in 5">
@@ -95,13 +88,11 @@
                             <span class="text-xs text-gray-500 font-bold" x-text="'(' + (m.reviewCount || 0) + ')'"></span>
                         </div>
                         
-                        <!-- Review Snippet -->
                         <div class="bg-blue-50 p-3 rounded-lg text-xs text-slate-600 italic mb-6 flex-1 border border-blue-100">
                             <i class="fas fa-quote-left text-blue-300 mr-1"></i>
                             <span x-text="m.latestReview ? truncate(m.latestReview.text, 60) : 'No reviews yet. Be the first partner!'"></span>
                         </div>
 
-                        <!-- Action -->
                         <a :href="'manufacturer-promo.html?id=' + m.id" class="block w-full bg-slate-900 text-white text-center py-3 rounded-lg font-bold hover:bg-blue-600 transition mt-auto shadow-md">
                             View Profile & Join
                         </a>
@@ -109,12 +100,9 @@
                 </div>
             </template>
         </div>
-
-        <!-- See More -->
+        
         <div x-show="!loading && manufacturers.length >= limit" class="text-center mt-16">
-            <button @click="loadMore" class="bg-white border border-gray-300 px-8 py-3 rounded-full hover:bg-gray-50 font-bold text-gray-600 shadow-sm transition">
-                Load More Manufacturers
-            </button>
+            <button @click="loadMore" class="bg-white border border-gray-300 px-8 py-3 rounded-full hover:bg-gray-50 font-bold text-gray-600 shadow-sm transition">Load More</button>
         </div>
     </section>
 
@@ -126,46 +114,18 @@
     <script>
         function homeApp() {
             return {
-                loading: true,
-                manufacturers: [],
-                limit: 20,
-
-                init() {
-                    this.loadManufacturers();
-                },
-
-                scrollToDirectory() {
-                    document.getElementById('directory').scrollIntoView({ behavior: 'smooth' });
-                },
-
+                loading: true, manufacturers: [], limit: 20,
+                init() { this.loadManufacturers(); },
+                scrollToDirectory() { document.getElementById('directory').scrollIntoView({ behavior: 'smooth' }); },
                 async loadManufacturers() {
                     try {
                         const db = firebase.firestore();
-                        const snap = await db.collection('agencies')
-                            .orderBy('createdAt', 'desc')
-                            .limit(this.limit)
-                            .get();
-                        
-                        this.manufacturers = snap.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                    } catch(e) {
-                        console.error("Error:", e);
-                    } finally {
-                        this.loading = false;
-                    }
+                        const snap = await db.collection('agencies').orderBy('createdAt', 'desc').limit(this.limit).get();
+                        this.manufacturers = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    } catch(e) { console.error(e); } finally { this.loading = false; }
                 },
-
-                async loadMore() {
-                    this.limit += 20;
-                    this.loadManufacturers();
-                },
-
-                truncate(str, n) {
-                    if(!str) return '';
-                    return (str.length > n) ? str.substr(0, n-1) + '...' : str;
-                }
+                async loadMore() { this.limit += 20; this.loadManufacturers(); },
+                truncate(str, n) { if(!str) return ''; return (str.length > n) ? str.substr(0, n-1) + '...' : str; }
             }
         }
     </script>
