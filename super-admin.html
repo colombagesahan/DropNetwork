@@ -23,6 +23,7 @@
             </div>
         </div>
 
+        <!-- DASHBOARD TAB -->
         <div x-show="nav === 'dashboard'">
             <div class="bg-gray-800 p-6 rounded-lg mb-8 border border-gray-700 shadow-lg">
                 <h2 class="text-xl font-bold mb-4 text-blue-400">📢 Global Broadcast System</h2>
@@ -60,6 +61,7 @@
             </div>
         </div>
 
+        <!-- DIRECTORY TAB -->
         <div x-show="nav === 'directory'">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-blue-400">Directory</h2>
@@ -71,26 +73,29 @@
                         <div class="p-4 flex justify-between items-center bg-gray-850 hover:bg-gray-750 transition">
                             <div class="flex items-center gap-4">
                                 <div class="bg-blue-900 text-blue-200 w-10 h-10 rounded flex items-center justify-center font-bold">M</div>
-                                <div><p class="font-bold text-white" x-text="agency.agencyName"></p><p class="text-sm text-blue-300" x-text="agency.email"></p></div>
+                                <div><p class="font-bold text-white" x-text="agency.agencyName || 'Manufacturer'"></p><p class="text-sm text-blue-300" x-text="agency.email"></p></div>
                             </div>
                             <div class="flex gap-2">
-                                <button @click="openCompose(agency.id, agency.agencyName, 'Manufacturer')" class="bg-blue-600 text-white px-4 py-2 rounded text-xs font-bold">Message</button>
+                                <button @click="openCompose(agency.id, agency.agencyName || agency.email, 'Manufacturer')" class="bg-blue-600 text-white px-4 py-2 rounded text-xs font-bold">Message</button>
                                 <button @click="toggleClients(agency.id)" class="bg-gray-700 text-white px-4 py-2 rounded text-xs border border-gray-500">Partners</button>
                             </div>
                         </div>
                         <div x-show="expandedAgency === agency.id" class="bg-gray-900 border-t border-gray-700 p-4 pl-12">
+                            <p x-show="clientsLoading" class="text-gray-500 text-xs">Loading partners...</p>
                             <template x-for="client in agencyClients">
                                 <div class="flex justify-between items-center border-b border-gray-800 py-3">
                                     <p class="text-sm text-white" x-text="client.fullName || client.email"></p>
-                                    <button @click="openCompose(client.id, client.fullName, 'Partner')" class="bg-gray-700 text-xs px-3 py-1 rounded text-white">Message</button>
+                                    <button @click="openCompose(client.id, client.fullName || client.email, 'Partner')" class="bg-gray-700 text-xs px-3 py-1 rounded text-white">Message</button>
                                 </div>
                             </template>
+                            <div x-show="!clientsLoading && agencyClients.length === 0" class="text-gray-500 text-xs italic">No partners found.</div>
                         </div>
                     </div>
                 </template>
             </div>
         </div>
 
+        <!-- COMPOSE MODAL -->
         <div x-show="composeOpen" x-cloak class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
             <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-blue-500 w-full max-w-md">
                 <h3 class="text-xl font-bold text-white mb-4">Send Private Message</h3>
@@ -132,6 +137,7 @@
                     if (newStatus === 'blocked') { updateData.warningStatus = true; updateData.blockedStatus = true; }
                     if (newStatus === 'open') { updateData.warningStatus = false; updateData.blockedStatus = false; }
                     await db.collection('agencies').doc(dispute.agencyId).update(updateData);
+                    alert("Status Updated: " + newStatus);
                 },
 
                 async sendBroadcast() {
@@ -159,6 +165,7 @@
                 
                 async sendPrivateMessage() {
                     if (!this.composeMsg) return;
+                    // Sending to 'alerts' so it appears in their dashboard stream
                     await firebase.firestore().collection('alerts').add({
                         message: this.composeMsg, target: this.composeTargetId, type: 'info', sender: 'Super Admin (Private)', createdAt: new Date()
                     });
