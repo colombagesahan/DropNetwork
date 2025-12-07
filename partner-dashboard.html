@@ -3,75 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <title>Partner Dashboard</title>
+    <!-- Dashboard Styles -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
-    <style>[x-cloak] { display: none !important; }</style>
+    
+    <!-- Website Template Styles (Scoped to 'website-preview' class) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        [x-cloak] { display: none !important; }
+        /* Scope the AC Website styles to avoid breaking the dashboard */
+        .website-preview {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f1f4f8;
+            color: #485460;
+        }
+        .website-preview h1, .website-preview h2 { color: #004aad; }
+        .website-preview .btn {
+            background: linear-gradient(135deg, #004aad, #00bcd4);
+            color: white; padding: 10px 20px; border-radius: 20px;
+        }
+        .product-card {
+            background: white; padding: 15px; border-radius: 10px; shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center; margin-bottom: 20px;
+        }
+        .product-card img { height: 150px; object-fit: contain; margin: 0 auto; }
+    </style>
 </head>
 <body class="bg-gray-50 font-sans" x-data="partnerApp()">
 
+    <!-- PROFILE MODAL -->
     <div x-show="!profileComplete && !loading" x-cloak class="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center">
         <div class="bg-white p-8 rounded shadow-lg max-w-md w-full">
             <h2 class="text-2xl font-bold mb-4 text-blue-600">Complete Profile</h2>
             <div class="space-y-3">
                 <input x-model="profileForm.fullName" placeholder="Full Name" class="w-full border p-2 rounded">
-                <input x-model="profileForm.phone" placeholder="Phone" class="w-full border p-2 rounded">
+                <input x-model="profileForm.phone" placeholder="WhatsApp Number (With Country Code)" class="w-full border p-2 rounded">
+                <input x-model="profileForm.address" placeholder="Address" class="w-full border p-2 rounded">
                 <input x-model="profileForm.bankInfo" placeholder="Bank Info" class="w-full border p-2 rounded">
+                <p class="text-xs text-gray-500">Your WhatsApp number will be used for customer orders.</p>
             </div>
             <button @click="saveProfile" class="mt-6 w-full bg-blue-600 text-white py-2 rounded font-bold">Save</button>
         </div>
     </div>
 
+    <!-- MAIN DASHBOARD -->
     <div x-show="profileComplete" class="flex h-screen overflow-hidden">
         
-        <div class="w-64 bg-white border-r flex flex-col">
-            <div class="p-6 font-bold text-xl text-blue-600">Store Manager</div>
-            <nav class="flex-1 px-4 space-y-1">
-                <a @click="tab='home'" class="block p-3 rounded hover:bg-gray-50 cursor-pointer" :class="tab=='home'?'bg-blue-50':''">Home</a>
-                <a @click="tab='website'" class="block p-3 rounded hover:bg-gray-50 cursor-pointer" :class="tab=='website'?'bg-blue-50':''">My Website</a>
-                <a @click="tab='support'" class="block p-3 rounded hover:bg-gray-50 cursor-pointer" :class="tab=='support'?'bg-blue-50':''">Chat with Manufacturer</a>
-                <a @click="tab='rate'" class="block p-3 rounded hover:bg-gray-50 cursor-pointer" :class="tab=='rate'?'bg-blue-50':''">Rate Manufacturer</a>
-                <a @click="tab='profile'" class="block p-3 rounded hover:bg-gray-50 cursor-pointer" :class="tab=='profile'?'bg-blue-50':''">Profile</a>
+        <!-- SIDEBAR -->
+        <div class="w-64 bg-white border-r flex flex-col shadow-lg z-20">
+            <div class="p-6 font-bold text-xl text-blue-600 border-b">Store Manager</div>
+            <nav class="flex-1 px-4 py-4 space-y-2">
+                <a @click="tab='home'" class="block p-3 rounded cursor-pointer" :class="tab=='home'?'bg-blue-50 text-blue-600 font-bold':''"><i class="fas fa-chart-line w-6"></i> Dashboard</a>
+                <a @click="tab='products'" class="block p-3 rounded cursor-pointer" :class="tab=='products'?'bg-blue-50 text-blue-600 font-bold':''"><i class="fas fa-box w-6"></i> My Products</a>
+                <a @click="tab='website'" class="block p-3 rounded cursor-pointer" :class="tab=='website'?'bg-blue-50 text-blue-600 font-bold':''"><i class="fas fa-globe w-6"></i> Live Website</a>
+                <a @click="tab='support'" class="block p-3 rounded cursor-pointer" :class="tab=='support'?'bg-blue-50 text-blue-600 font-bold':''"><i class="fas fa-comments w-6"></i> Chat with Manufacturer</a>
+                <a @click="tab='rate'" class="block p-3 rounded cursor-pointer" :class="tab=='rate'?'bg-blue-50 text-blue-600 font-bold':''"><i class="fas fa-star w-6"></i> Rate Manufacturer</a>
+                <a @click="tab='profile'" class="block p-3 rounded cursor-pointer" :class="tab=='profile'?'bg-blue-50 text-blue-600 font-bold':''"><i class="fas fa-user w-6"></i> Profile</a>
             </nav>
-            <button @click="auth.signOut()" class="p-4 border-t w-full text-left text-gray-500">Logout</button>
+            <button @click="auth.signOut()" class="p-4 border-t w-full text-left text-gray-500 hover:text-red-500">Logout</button>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-8">
+        <div class="flex-1 overflow-y-auto p-8 relative">
             
+            <!-- TAB: HOME -->
             <div x-show="tab==='home'">
-                <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+                <h1 class="text-2xl font-bold mb-6">Overview</h1>
                 <div class="grid grid-cols-2 gap-6">
                     <div class="bg-white p-6 rounded shadow border-l-4 border-green-500">
                         <p class="text-gray-500">Unpaid Earnings</p>
                         <p class="text-3xl font-bold" x-text="'$' + (userData.unpaidEarnings || 0)"></p>
                     </div>
                     <div class="bg-white p-6 rounded shadow border-l-4 border-red-500">
-                        <p class="text-gray-500 font-bold">Missing Payment?</p>
-                        <button @click="reportIssue" class="mt-2 bg-red-600 text-white px-4 py-2 rounded font-bold text-sm w-full">Report</button>
+                        <p class="text-gray-500 font-bold">Payment Issue?</p>
+                        <button @click="reportIssue" class="mt-2 bg-red-600 text-white px-4 py-2 rounded font-bold text-sm w-full">Report to Super Admin</button>
                     </div>
                 </div>
             </div>
 
-            <!-- RATE MANUFACTURER (NEW) -->
-            <div x-show="tab==='rate'">
-                <h2 class="text-2xl font-bold mb-6">Rate Your Manufacturer</h2>
-                <div class="bg-white p-6 rounded shadow max-w-lg">
-                    <p class="mb-2 text-gray-600">How is your experience working with <span x-text="agencyName" class="font-bold"></span>?</p>
-                    <div class="flex gap-2 mb-4">
-                        <template x-for="i in 5">
-                            <button @click="reviewRating=i" class="text-3xl" :class="i<=reviewRating?'text-yellow-500':'text-gray-300'">★</button>
+            <!-- TAB: PRODUCTS (Manage Pricing) -->
+            <div x-show="tab==='products'">
+                <h2 class="text-2xl font-bold mb-6">Manage Inventory</h2>
+                <p class="mb-4 text-gray-600">These products are provided by your Manufacturer. You can edit the selling price.</p>
+                
+                <div class="bg-white rounded shadow overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-50"><tr><th class="p-4">Product</th><th class="p-4">Base Cost</th><th class="p-4">Your Price</th><th class="p-4">Action</th></tr></thead>
+                        <tbody>
+                            <template x-for="p in myInventory">
+                                <tr class="border-t">
+                                    <td class="p-4 flex items-center gap-3">
+                                        <img :src="p.image || 'https://via.placeholder.com/50'" class="w-10 h-10 object-cover rounded">
+                                        <span x-text="p.name"></span>
+                                    </td>
+                                    <td class="p-4 text-gray-500" x-text="'$' + p.basePrice"></td>
+                                    <td class="p-4">
+                                        <input type="number" x-model="p.sellingPrice" class="border p-1 w-24 rounded" placeholder="Price">
+                                    </td>
+                                    <td class="p-4">
+                                        <button @click="updatePrice(p)" class="bg-blue-600 text-white px-3 py-1 rounded text-xs">Save Price</button>
+                                        <button @click="removeProduct(p.id)" class="text-red-500 ml-2 text-xs">Remove</button>
+                                    </td>
+                                </div>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Import Section -->
+                <div class="mt-8">
+                    <h3 class="font-bold text-lg mb-4">Available from Manufacturer</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <template x-for="p in manufacturerCatalog">
+                            <div class="bg-white p-4 rounded shadow border border-gray-200">
+                                <img :src="p.image" class="h-32 mx-auto object-contain mb-2">
+                                <h4 class="font-bold text-sm truncate" x-text="p.name"></h4>
+                                <p class="text-xs text-gray-500 mb-2">Cost: $<span x-text="p.price"></span></p>
+                                <button @click="importProduct(p)" class="w-full bg-green-600 text-white py-1 rounded text-sm">Add to Store</button>
+                            </div>
                         </template>
                     </div>
-                    <textarea x-model="reviewText" class="w-full border p-2 rounded mb-4" placeholder="Write a review..."></textarea>
-                    <button @click="submitReview" class="bg-yellow-500 text-white px-6 py-2 rounded font-bold">Submit Review</button>
                 </div>
             </div>
 
+            <!-- TAB: LIVE WEBSITE PREVIEW (The AC Template) -->
+            <div x-show="tab==='website'" class="website-preview min-h-screen bg-white rounded-lg shadow-2xl border border-gray-300 overflow-hidden">
+                
+                <!-- Website Header -->
+                <header class="bg-blue-900 text-white p-4 flex justify-between items-center">
+                    <div class="font-bold text-xl">
+                        <span x-text="agencyName"></span> <span class="text-xs font-normal opacity-75">| Authorized Partner: <span x-text="userData.fullName"></span></span>
+                    </div>
+                    <div class="flex gap-4 text-sm">
+                        <a href="#shop" class="hover:text-blue-300">Shop</a>
+                        <a href="#contact" class="hover:text-blue-300">Contact</a>
+                    </div>
+                </header>
+
+                <!-- Hero -->
+                <section class="text-center py-20 bg-gradient-to-b from-blue-900 to-blue-800 text-white">
+                    <h1 class="text-4xl font-bold mb-4">Premium Cooling Solutions</h1>
+                    <p class="mb-8 opacity-90">Order directly via WhatsApp for fast delivery.</p>
+                    <a href="#shop" class="bg-yellow-500 text-black px-8 py-3 rounded-full font-bold shadow-lg">Shop Now</a>
+                </section>
+
+                <!-- Shop Grid (Live Data) -->
+                <section id="shop" class="p-8 bg-gray-50">
+                    <h2 class="text-3xl font-bold text-center mb-8 text-gray-800">Our Products</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <template x-for="p in myInventory">
+                            <div class="bg-white p-4 rounded-xl shadow hover:shadow-lg transition">
+                                <img :src="p.image" class="h-40 mx-auto object-contain mb-4">
+                                <h3 class="font-bold text-lg text-gray-800" x-text="p.name"></h3>
+                                <p class="text-blue-600 font-bold text-xl my-2" x-text="'$' + p.sellingPrice"></p>
+                                <button @click="addToCart(p)" class="w-full bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700">
+                                    <i class="fas fa-cart-plus"></i> Add to Cart
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </section>
+
+                <!-- Cart / Order Section -->
+                <div x-show="cart.length > 0" class="fixed bottom-0 right-0 m-6 bg-white p-6 rounded-xl shadow-2xl border border-blue-500 w-80 z-50">
+                    <h3 class="font-bold text-lg mb-2">Your Cart</h3>
+                    <div class="max-h-40 overflow-y-auto mb-4">
+                        <template x-for="item in cart">
+                            <div class="flex justify-between text-sm mb-1">
+                                <span x-text="item.name"></span>
+                                <span class="font-bold" x-text="'$' + item.sellingPrice"></span>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="border-t pt-2 font-bold flex justify-between mb-4">
+                        <span>Total:</span>
+                        <span x-text="'$' + cartTotal"></span>
+                    </div>
+                    <input x-model="customerName" placeholder="Your Name" class="w-full border p-2 rounded mb-2 text-sm">
+                    <input x-model="customerPhone" placeholder="Your Phone" class="w-full border p-2 rounded mb-2 text-sm">
+                    <button @click="checkout" class="w-full bg-green-500 text-white py-2 rounded font-bold flex items-center justify-center gap-2">
+                        <i class="fab fa-whatsapp"></i> Order on WhatsApp
+                    </button>
+                </div>
+
+                <!-- Footer -->
+                <footer class="bg-gray-900 text-gray-400 p-8 text-center text-sm">
+                    <p>Marketing Partner: <span class="text-white" x-text="userData.fullName"></span> | Phone: <span x-text="userData.phone"></span></p>
+                    <p>Manufacturing by: <span class="text-white" x-text="agencyName"></span></p>
+                    <div class="mt-4 inline-block bg-blue-900 text-white px-3 py-1 rounded text-xs">AUTHORIZED PARTNER BADGE</div>
+                </footer>
+            </div>
+
+            <!-- OTHER TABS (Chat, Rate, Profile) -->
             <div x-show="tab==='support'" class="h-[80vh] flex flex-col bg-white rounded shadow">
-                <div class="p-4 border-b font-bold bg-gray-50">Chat</div>
+                <div class="p-4 border-b font-bold bg-gray-50">Chat with Manufacturer</div>
                 <div class="flex-1 overflow-y-auto p-4 space-y-3" id="chatBox">
                     <template x-for="m in messages">
                         <div class="flex" :class="m.senderId === uid ? 'justify-end' : 'justify-start'">
@@ -87,12 +215,25 @@
                 </div>
             </div>
 
+            <div x-show="tab==='rate'">
+                <h2 class="text-2xl font-bold mb-6">Rate Your Manufacturer</h2>
+                <div class="bg-white p-6 rounded shadow max-w-lg">
+                    <div class="flex gap-2 mb-4">
+                        <template x-for="i in 5">
+                            <button @click="reviewRating=i" class="text-3xl" :class="i<=reviewRating?'text-yellow-500':'text-gray-300'">★</button>
+                        </template>
+                    </div>
+                    <textarea x-model="reviewText" class="w-full border p-2 rounded mb-4" placeholder="Write a review..."></textarea>
+                    <button @click="submitReview" class="bg-yellow-500 text-white px-6 py-2 rounded font-bold">Submit Review</button>
+                </div>
+            </div>
+
             <div x-show="tab==='profile'">
                 <h2 class="text-2xl font-bold mb-6">Profile</h2>
                 <div class="bg-white p-6 rounded shadow max-w-lg space-y-4">
                     <input x-model="profileForm.fullName" class="w-full border p-2 rounded">
                     <input x-model="profileForm.phone" class="w-full border p-2 rounded">
-                    <input x-model="profileForm.bankInfo" class="w-full border p-2 rounded">
+                    <input x-model="profileForm.address" class="w-full border p-2 rounded">
                     <button @click="saveProfile" class="bg-green-600 text-white px-6 py-2 rounded">Update</button>
                 </div>
             </div>
@@ -105,13 +246,22 @@
             return {
                 tab: 'home', uid: null, userData: {}, agencyName: '',
                 profileComplete: false, loading: true, profileForm: {},
+                manufacturerCatalog: [], myInventory: [],
                 messages: [], chatInput: '', reviewRating: 0, reviewText: '',
+                // Cart Logic
+                cart: [], customerName: '', customerPhone: '',
 
                 init() {
                     auth.onAuthStateChanged(user => {
-                        if(user) { this.uid = user.uid; this.loadData(); } 
-                        else window.location.href='index.html';
+                        if(user) {
+                            this.uid = user.uid;
+                            this.loadData();
+                        } else window.location.href='index.html';
                     });
+                },
+
+                get cartTotal() {
+                    return this.cart.reduce((sum, item) => sum + (parseFloat(item.sellingPrice) || 0), 0);
                 },
 
                 async loadData() {
@@ -120,22 +270,108 @@
                     if(doc.exists) {
                         this.userData = doc.data();
                         if(this.userData.phone && this.userData.fullName) {
-                            this.profileComplete = true; this.profileForm = { ...this.userData }; this.listenChat();
-                            // Get Agency Name
+                            this.profileComplete = true; 
+                            this.profileForm = { ...this.userData }; 
+                            this.listenChat();
+                            
+                            // Load Manufacturer Data
                             const ag = await db.collection('agencies').doc(this.userData.parentAgency).get();
-                            if(ag.exists) this.agencyName = ag.data().agencyName;
+                            if(ag.exists) {
+                                this.agencyName = ag.data().agencyName;
+                                this.loadCatalog(this.userData.parentAgency);
+                            }
+                            this.loadMyInventory();
                         } else this.profileComplete = false;
                     }
                     this.loading = false;
                 },
 
+                // 1. Load Manufacturer's Master Catalog
+                async loadCatalog(agencyId) {
+                    const snap = await firebase.firestore().collection('agencies').doc(agencyId).collection('master_catalog').get();
+                    this.manufacturerCatalog = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                },
+
+                // 2. Load My Selected Products
+                async loadMyInventory() {
+                    const snap = await firebase.firestore().collection('users').doc(this.uid).collection('products').get();
+                    this.myInventory = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                },
+
+                // 3. Import Product Logic
+                async importProduct(p) {
+                    // Check duplicates
+                    if(this.myInventory.find(i => i.name === p.name)) return alert("Already added!");
+                    
+                    await firebase.firestore().collection('users').doc(this.uid).collection('products').add({
+                        name: p.name,
+                        basePrice: p.price,
+                        sellingPrice: p.price, // Default selling price = base price
+                        image: p.image || 'https://via.placeholder.com/150',
+                        originalId: p.id
+                    });
+                    this.loadMyInventory();
+                    alert("Product Added to Your Website!");
+                },
+
+                async updatePrice(p) {
+                    await firebase.firestore().collection('users').doc(this.uid).collection('products').doc(p.id).update({
+                        sellingPrice: p.sellingPrice
+                    });
+                    alert("Price Updated!");
+                },
+
+                async removeProduct(id) {
+                    if(confirm("Remove from store?")) {
+                        await firebase.firestore().collection('users').doc(this.uid).collection('products').doc(id).delete();
+                        this.loadMyInventory();
+                    }
+                },
+
+                // --- CART & ORDER LOGIC ---
+                addToCart(p) {
+                    this.cart.push(p);
+                },
+
+                async checkout() {
+                    if(!this.customerName || !this.customerPhone) return alert("Please enter Name and Phone");
+                    
+                    // 1. SAVE ORDER TO DB
+                    const db = firebase.firestore();
+                    const orderData = {
+                        customerName: this.customerName,
+                        customerPhone: this.customerPhone,
+                        items: this.cart,
+                        total: this.cartTotal,
+                        partnerId: this.uid,
+                        manufacturerId: this.userData.parentAgency,
+                        status: 'New',
+                        date: new Date()
+                    };
+                    
+                    // Add to Manufacturer's Order List (Ideally shared collection)
+                    // For MVP, we save to a root 'orders' collection
+                    await db.collection('orders').add(orderData);
+
+                    // 2. WHATSAPP LOGIC
+                    const partnerPhone = this.userData.phone.replace(/[^0-9]/g, ''); // Partner's WhatsApp
+                    let msg = `*New Order on Website*\nCustomer: ${this.customerName}\nPhone: ${this.customerPhone}\n\n*Items:*`;
+                    this.cart.forEach(i => msg += `\n- ${i.name} : $${i.sellingPrice}`);
+                    msg += `\n\n*Total: $${this.cartTotal}*`;
+                    
+                    // Open WhatsApp to PARTNER
+                    window.open(`https://wa.me/${partnerPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+                    
+                    this.cart = [];
+                    alert("Order Placed! Please forward the details to your Manufacturer if needed.");
+                },
+
+                // --- EXISTING FUNCTIONS (Chat, Profile, Report) ---
                 async saveProfile() {
                     if(!this.profileForm.phone) return alert("Fill details");
                     await firebase.firestore().collection('users').doc(this.uid).update(this.profileForm);
-                    this.profileComplete = true;
-                    alert("Saved!");
+                    this.profileComplete = true; alert("Saved!");
                 },
-
                 listenChat() {
                     firebase.firestore().collection('messages').orderBy('timestamp').onSnapshot(snap => {
                         const all = snap.docs.map(d => d.data());
@@ -143,7 +379,6 @@
                         setTimeout(() => { document.getElementById('chatBox').scrollTop = 9999; }, 100);
                     });
                 },
-
                 async sendChat() {
                     if(!this.chatInput) return;
                     await firebase.firestore().collection('messages').add({
@@ -151,29 +386,13 @@
                     });
                     this.chatInput = '';
                 },
-
                 async submitReview() {
-                    if(this.reviewRating===0 || !this.reviewText) return alert("Add rating and text");
-                    const db = firebase.firestore();
-                    const aid = this.userData.parentAgency;
-                    
-                    // Add Review
-                    await db.collection('agencies').doc(aid).collection('reviews').add({
+                    if(this.reviewRating===0) return alert("Rate stars");
+                    await firebase.firestore().collection('agencies').doc(this.userData.parentAgency).collection('reviews').add({
                         rating: this.reviewRating, comment: this.reviewText, partnerName: this.userData.fullName, date: new Date()
                     });
-
-                    // Recalc Average (Simplified)
-                    const snaps = await db.collection('agencies').doc(aid).collection('reviews').get();
-                    let total=0; snaps.forEach(r => total+=r.data().rating);
-                    const avg = total/snaps.size;
-
-                    await db.collection('agencies').doc(aid).update({
-                        avgRating: avg, reviewCount: snaps.size, latestReview: { text: this.reviewText, rating: this.reviewRating }
-                    });
-                    
-                    alert("Review Submitted!"); this.reviewText=''; this.reviewRating=0;
+                    alert("Review Submitted!");
                 },
-
                 async reportIssue() {
                     if(confirm("Report to Super Admin?")) {
                         await firebase.firestore().collection('disputes').add({
