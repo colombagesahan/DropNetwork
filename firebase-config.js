@@ -1,5 +1,5 @@
 const firebaseConfig = {
-  apiKey: "AIzaSyBUjzMFao9BS3uXBOW3qYrLVqHaGn8qIk4", // Your Real Key
+  apiKey: "AIzaSyBUjzMFao9BS3uXBOW3qYrLVqHaGn8qIk4", 
   authDomain: "onlineshop-30cd1.firebaseapp.com",
   projectId: "onlineshop-30cd1",
   storageBucket: "onlineshop-30cd1.firebasestorage.app",
@@ -11,7 +11,10 @@ if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
 
-window.auth = firebase.auth();
+// Safe initialization
+if (firebase.auth) {
+  window.auth = firebase.auth();
+}
 window.db = firebase.firestore();
 
 console.log("Firebase Connected Successfully");
