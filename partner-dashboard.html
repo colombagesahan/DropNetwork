@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Partner Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <style>[x-cloak] { display: none !important; }</style>
+</head>
+<body class="bg-gray-50 font-sans" x-data="partnerApp()">
+
+    <div x-show="!profileComplete && !loading" x-cloak class="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center">
+        <div class="bg-white p-8 rounded shadow-lg max-w-md w-full">
+            <h2 class="text-2xl font-bold mb-4 text-blue-600">Complete Profile</h2>
+            <div class="space-y-3">
+                <input x-model="profileForm.fullName" placeholder="Full Name" class="w-full border p-2 rounded">
+                <input x-model="profileForm.phone" placeholder="Phone" class="w-full border p-2 rounded">
+                <input x-model="profileForm.bankInfo" placeholder="Bank Info" class="w-full border p-2 rounded">
+            </div>
+            <button @click="saveProfile" class="mt-6 w-full bg-blue-600 text-white py-2 rounded font-bold">Save</button>
+        </div>
+    </div>
+
+    <div x-show="profileComplete" class="flex h-screen overflow-hidden">
+        
+        <div class="w-64 bg-white border-r flex flex-col">
+            <div class="p-6 font-bold text-xl text-blue-600">Store Manager</div>
+            <nav class="flex-1 px-4 space-y-1">
+                <a @click="tab='home'" class="block p-3 rounded hover:bg-gray-50 cursor-pointer" :class="tab=='home'?'bg-blue-50':''">Home</a>
+                <a @click="tab='website'" class="block p-3 rounded hover:bg-gray-50 cursor-pointer" :class="tab=='website'?'bg-blue-50':''">My Website</a>
+                <a @click="tab='support'" class="block p-3 rounded hover:bg-gray-50 cursor-pointer" :class="tab=='support'?'bg-blue-50':''">Chat with Manufacturer</a>
+                <a @click="tab='rate'" class="block p-3 rounded hover:bg-gray-50 cursor-pointer" :class="tab=='rate'?'bg-blue-50':''">Rate Manufacturer</a>
+                <a @click="tab='profile'" class="block p-3 rounded hover:bg-gray-50 cursor-pointer" :class="tab=='profile'?'bg-blue-50':''">Profile</a>
+            </nav>
+            <button @click="auth.signOut()" class="p-4 border-t w-full text-left text-gray-500">Logout</button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-8">
+            
+            <div x-show="tab==='home'">
+                <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded shadow border-l-4 border-green-500">
+                        <p class="text-gray-500">Unpaid Earnings</p>
+                        <p class="text-3xl font-bold" x-text="'$' + (userData.unpaidEarnings || 0)"></p>
+                    </div>
+                    <div class="bg-white p-6 rounded shadow border-l-4 border-red-500">
+                        <p class="text-gray-500 font-bold">Missing Payment?</p>
+                        <button @click="reportIssue" class="mt-2 bg-red-600 text-white px-4 py-2 rounded font-bold text-sm w-full">Report</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RATE MANUFACTURER (NEW) -->
+            <div x-show="tab==='rate'">
+                <h2 class="text-2xl font-bold mb-6">Rate Your Manufacturer</h2>
+                <div class="bg-white p-6 rounded shadow max-w-lg">
+                    <p class="mb-2 text-gray-600">How is your experience working with <span x-text="agencyName" class="font-bold"></span>?</p>
+                    <div class="flex gap-2 mb-4">
+                        <template x-for="i in 5">
+                            <button @click="reviewRating=i" class="text-3xl" :class="i<=reviewRating?'text-yellow-500':'text-gray-300'">★</button>
+                        </template>
+                    </div>
+                    <textarea x-model="reviewText" class="w-full border p-2 rounded mb-4" placeholder="Write a review..."></textarea>
+                    <button @click="submitReview" class="bg-yellow-500 text-white px-6 py-2 rounded font-bold">Submit Review</button>
+                </div>
+            </div>
+
+            <div x-show="tab==='support'" class="h-[80vh] flex flex-col bg-white rounded shadow">
+                <div class="p-4 border-b font-bold bg-gray-50">Chat</div>
+                <div class="flex-1 overflow-y-auto p-4 space-y-3" id="chatBox">
+                    <template x-for="m in messages">
+                        <div class="flex" :class="m.senderId === uid ? 'justify-end' : 'justify-start'">
+                            <div class="px-4 py-2 rounded-lg max-w-xs text-sm" :class="m.senderId === uid ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'">
+                                <p x-text="m.text"></p>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <div class="p-4 border-t flex gap-2">
+                    <input x-model="chatInput" @keyup.enter="sendChat" class="flex-1 border p-2 rounded" placeholder="Message...">
+                    <button @click="sendChat" class="bg-blue-600 text-white px-4 rounded">Send</button>
+                </div>
+            </div>
+
+            <div x-show="tab==='profile'">
+                <h2 class="text-2xl font-bold mb-6">Profile</h2>
+                <div class="bg-white p-6 rounded shadow max-w-lg space-y-4">
+                    <input x-model="profileForm.fullName" class="w-full border p-2 rounded">
+                    <input x-model="profileForm.phone" class="w-full border p-2 rounded">
+                    <input x-model="profileForm.bankInfo" class="w-full border p-2 rounded">
+                    <button @click="saveProfile" class="bg-green-600 text-white px-6 py-2 rounded">Update</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        function partnerApp() {
+            return {
+                tab: 'home', uid: null, userData: {}, agencyName: '',
+                profileComplete: false, loading: true, profileForm: {},
+                messages: [], chatInput: '', reviewRating: 0, reviewText: '',
+
+                init() {
+                    auth.onAuthStateChanged(user => {
+                        if(user) { this.uid = user.uid; this.loadData(); } 
+                        else window.location.href='index.html';
+                    });
+                },
+
+                async loadData() {
+                    const db = firebase.firestore();
+                    const doc = await db.collection('users').doc(this.uid).get();
+                    if(doc.exists) {
+                        this.userData = doc.data();
+                        if(this.userData.phone && this.userData.fullName) {
+                            this.profileComplete = true; this.profileForm = { ...this.userData }; this.listenChat();
+                            // Get Agency Name
+                            const ag = await db.collection('agencies').doc(this.userData.parentAgency).get();
+                            if(ag.exists) this.agencyName = ag.data().agencyName;
+                        } else this.profileComplete = false;
+                    }
+                    this.loading = false;
+                },
+
+                async saveProfile() {
+                    if(!this.profileForm.phone) return alert("Fill details");
+                    await firebase.firestore().collection('users').doc(this.uid).update(this.profileForm);
+                    this.profileComplete = true;
+                    alert("Saved!");
+                },
+
+                listenChat() {
+                    firebase.firestore().collection('messages').orderBy('timestamp').onSnapshot(snap => {
+                        const all = snap.docs.map(d => d.data());
+                        this.messages = all.filter(m => m.senderId === this.uid || m.receiverId === this.uid);
+                        setTimeout(() => { document.getElementById('chatBox').scrollTop = 9999; }, 100);
+                    });
+                },
+
+                async sendChat() {
+                    if(!this.chatInput) return;
+                    await firebase.firestore().collection('messages').add({
+                        senderId: this.uid, receiverId: this.userData.parentAgency, text: this.chatInput, timestamp: new Date()
+                    });
+                    this.chatInput = '';
+                },
+
+                async submitReview() {
+                    if(this.reviewRating===0 || !this.reviewText) return alert("Add rating and text");
+                    const db = firebase.firestore();
+                    const aid = this.userData.parentAgency;
+                    
+                    // Add Review
+                    await db.collection('agencies').doc(aid).collection('reviews').add({
+                        rating: this.reviewRating, comment: this.reviewText, partnerName: this.userData.fullName, date: new Date()
+                    });
+
+                    // Recalc Average (Simplified)
+                    const snaps = await db.collection('agencies').doc(aid).collection('reviews').get();
+                    let total=0; snaps.forEach(r => total+=r.data().rating);
+                    const avg = total/snaps.size;
+
+                    await db.collection('agencies').doc(aid).update({
+                        avgRating: avg, reviewCount: snaps.size, latestReview: { text: this.reviewText, rating: this.reviewRating }
+                    });
+                    
+                    alert("Review Submitted!"); this.reviewText=''; this.reviewRating=0;
+                },
+
+                async reportIssue() {
+                    if(confirm("Report to Super Admin?")) {
+                        await firebase.firestore().collection('disputes').add({
+                            agencyId: this.userData.parentAgency, clientEmail: this.userData.email,
+                            clientName: this.userData.fullName, clientPhone: this.userData.phone,
+                            amount: this.userData.unpaidEarnings, status: 'open', date: new Date()
+                        });
+                        alert("Reported.");
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
