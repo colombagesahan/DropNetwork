@@ -10,6 +10,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
+    <style>[x-cloak] { display: none !important; }</style>
 </head>
 <body class="bg-gray-50 font-sans" x-data="authLogic()" x-init="initApp()">
 
@@ -41,7 +42,7 @@
     </header>
 
     <!-- Modal -->
-    <div x-show="openLogin" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm" style="display: none;">
+    <div x-show="openLogin" x-cloak class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm">
         <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full relative">
             <button @click="openLogin = false" class="absolute top-4 right-4 text-gray-400 text-xl hover:text-gray-600">&times;</button>
             
@@ -97,16 +98,25 @@
                     try {
                         let cred;
                         
-                        // 1. PERFORM AUTHENTICATION
+                        // 1. SUPER ADMIN CHECK
+                        if(cleanEmail === 'colombagesahan@gmail.com') { 
+                            if(action === 'signup') await auth.createUserWithEmailAndPassword(cleanEmail, cleanPass);
+                            else await auth.signInWithEmailAndPassword(cleanEmail, cleanPass);
+                            window.location.href = 'super-admin.html'; 
+                            return; 
+                        }
+
+                        // 2. REGULAR AUTH
                         if (action === 'signup') {
-                            // Check limits if registering as partner
+                            // Partner Limit Check
                             if (this.inviteAgencyId) {
                                 const agDoc = await db.collection('agencies').doc(this.inviteAgencyId).get();
-                                const agData = agDoc.data();
-                                const partnersSnap = await db.collection('users').where('parentAgency', '==', this.inviteAgencyId).get();
-                                if (agData.plan !== 'unlimited' && partnersSnap.size >= 10) {
-                                    this.error = "This Manufacturer has reached their Partner limit. They must upgrade.";
-                                    return;
+                                if(agDoc.exists) {
+                                    const agData = agDoc.data();
+                                    const partnersSnap = await db.collection('users').where('parentAgency', '==', this.inviteAgencyId).get();
+                                    if (agData.plan !== 'unlimited' && partnersSnap.size >= 10) {
+                                        this.error = "Manufacturer has reached Partner limit."; return;
+                                    }
                                 }
                             }
                             cred = await auth.createUserWithEmailAndPassword(cleanEmail, cleanPass);
@@ -114,19 +124,12 @@
                             cred = await auth.signInWithEmailAndPassword(cleanEmail, cleanPass);
                         }
 
-                        // 2. *** SUPER ADMIN CHECK (MOVED HERE) ***
-                        // This now runs for BOTH Login and Signup
-                        if(cleanEmail === 'colombagesahan@gmail.com') { 
-                            window.location.href = 'super-admin.html'; 
-                            return; 
-                        }
-
                         const uid = cred.user.uid;
 
-                        // 3. DATABASE LOGIC
+                        // 3. DATABASE SETUP
                         if (action === 'signup') {
                             if (this.inviteAgencyId) {
-                                // CREATE PARTNER
+                                // Create Partner
                                 await db.collection('users').doc(uid).set({
                                     email: cleanEmail,
                                     parentAgency: this.inviteAgencyId,
@@ -136,7 +139,7 @@
                                 });
                                 window.location.href = 'partner-dashboard.html';
                             } else {
-                                // CREATE MANUFACTURER
+                                // Create Manufacturer
                                 await db.collection('agencies').doc(uid).set({
                                     email: cleanEmail,
                                     role: 'agency',
@@ -151,12 +154,15 @@
                                 window.location.href = 'manufacturer-dashboard.html';
                             }
                         } else {
-                            // LOGIN REDIRECT
+                            // Login Redirect
                             const agencyDoc = await db.collection('agencies').doc(uid).get();
                             if (agencyDoc.exists) { window.location.href = 'manufacturer-dashboard.html'; return; }
                             
                             const userDoc = await db.collection('users').doc(uid).get();
                             if (userDoc.exists) { window.location.href = 'partner-dashboard.html'; return; }
+                            
+                            // Fallback
+                            window.location.href = 'manufacturer-dashboard.html';
                         }
 
                     } catch (e) { this.error = e.message; }
