@@ -10,7 +10,10 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>[x-cloak] { display: none !important; }</style>
+    <style>
+        [x-cloak] { display: none !important; }
+        .website-preview { font-family: sans-serif; background-color: #f1f4f8; }
+    </style>
 </head>
 <body class="bg-gray-50 font-sans" x-data="partnerApp()">
 
@@ -20,7 +23,7 @@
             <h2 class="text-2xl font-bold mb-4 text-blue-600">Complete Profile</h2>
             <div class="space-y-3">
                 <input x-model="profileForm.fullName" placeholder="Full Name" class="w-full border p-2 rounded">
-                <input x-model="profileForm.phone" placeholder="WhatsApp (With Country Code)" class="w-full border p-2 rounded">
+                <input x-model="profileForm.phone" placeholder="WhatsApp Number" class="w-full border p-2 rounded">
                 <input x-model="profileForm.bankInfo" placeholder="Bank Info" class="w-full border p-2 rounded">
             </div>
             <button @click="saveProfile" class="mt-6 w-full bg-blue-600 text-white py-2 rounded font-bold">Save</button>
@@ -36,6 +39,7 @@
             <nav class="flex-1 px-4 py-4 space-y-2">
                 <a @click="tab='home'" class="block p-3 rounded cursor-pointer" :class="tab=='home'?'bg-blue-50 text-blue-600 font-bold':''"><i class="fas fa-chart-line w-6"></i> Dashboard</a>
                 <a @click="tab='products'" class="block p-3 rounded cursor-pointer" :class="tab=='products'?'bg-blue-50 text-blue-600 font-bold':''"><i class="fas fa-box w-6"></i> My Products</a>
+                <a @click="tab='website'" class="block p-3 rounded cursor-pointer" :class="tab=='website'?'bg-blue-50 text-blue-600 font-bold':''"><i class="fas fa-globe w-6"></i> Live Website</a>
                 <a @click="tab='support'" class="block p-3 rounded cursor-pointer" :class="tab=='support'?'bg-blue-50 text-blue-600 font-bold':''"><i class="fas fa-comments w-6"></i> Chat</a>
                 <a @click="tab='rate'" class="block p-3 rounded cursor-pointer" :class="tab=='rate'?'bg-blue-50 text-blue-600 font-bold':''"><i class="fas fa-star w-6"></i> Rate</a>
                 <a @click="tab='profile'" class="block p-3 rounded cursor-pointer" :class="tab=='profile'?'bg-blue-50 text-blue-600 font-bold':''"><i class="fas fa-user w-6"></i> Profile</a>
@@ -66,20 +70,20 @@
                 
                 <!-- My Products List -->
                 <div class="bg-white rounded shadow overflow-hidden mb-8">
+                    <div class="p-4 bg-gray-50 border-b font-bold">Products on Your Website</div>
                     <table class="w-full text-left">
-                        <thead class="bg-gray-50"><tr><th class="p-4">Product</th><th class="p-4">Stock Status</th><th class="p-4">Base Cost</th><th class="p-4">Your Price</th><th class="p-4">Action</th></tr></thead>
+                        <thead class="bg-gray-100 text-sm"><tr><th class="p-4">Product</th><th class="p-4">Status</th><th class="p-4">Base Cost</th><th class="p-4">Your Price</th><th class="p-4">Action</th></tr></thead>
                         <tbody>
                             <template x-for="p in myInventory">
                                 <tr class="border-t">
                                     <td class="p-4 flex items-center gap-3">
-                                        <img :src="p.image || 'https://via.placeholder.com/50'" class="w-10 h-10 object-cover rounded">
+                                        <img :src="getImage(p)" class="w-10 h-10 object-cover rounded">
                                         <span x-text="p.name"></span>
                                     </td>
                                     <td class="p-4">
-                                        <!-- Stock Check based on Manufacturer Data -->
-                                        <span x-text="getStockStatus(p.originalId)" 
-                                              class="px-2 py-1 rounded text-xs font-bold text-white"
-                                              :class="isStockAvailable(p.originalId) ? 'bg-green-500' : 'bg-red-500'">
+                                        <span class="px-2 py-1 rounded text-xs font-bold text-white"
+                                              :class="isStockAvailable(p.originalId) ? 'bg-green-500' : 'bg-red-500'"
+                                              x-text="getStockStatus(p.originalId)">
                                         </span>
                                     </td>
                                     <td class="p-4 text-gray-500" x-text="'$' + p.basePrice"></td>
@@ -92,22 +96,28 @@
                             </template>
                         </tbody>
                     </table>
+                    <div x-show="myInventory.length === 0" class="p-4 text-center text-gray-400 text-sm">You haven't added any products yet. Import some below!</div>
                 </div>
                 
                 <!-- Import Products -->
                 <div class="bg-gray-100 p-6 rounded-lg">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-lg">Import from Manufacturer</h3>
+                        <h3 class="font-bold text-lg">Import from Manufacturer Catalog</h3>
                         <select x-model="filterCategory" class="border p-2 rounded">
                             <option value="">All Categories</option>
                             <template x-for="cat in categories"><option :value="cat" x-text="cat"></option></template>
                         </select>
                     </div>
+                    
+                    <div x-show="manufacturerCatalog.length === 0" class="text-center text-gray-500 py-10">
+                        <i class="fas fa-spinner fa-spin mb-2"></i><br>Loading catalog... (If empty, Manufacturer has no products)
+                    </div>
+
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <template x-for="p in filteredCatalog">
                             <div class="bg-white p-4 rounded shadow border border-gray-200">
-                                <div class="relative h-32 mb-2">
-                                    <img :src="p.images ? p.images[0] : 'https://via.placeholder.com/150'" class="w-full h-full object-contain">
+                                <div class="relative h-32 mb-2 bg-gray-50 flex items-center justify-center">
+                                    <img :src="getImage(p)" class="w-full h-full object-contain">
                                     <span class="absolute top-0 right-0 bg-gray-800 text-white text-xs px-2 py-1 rounded" x-text="p.category"></span>
                                 </div>
                                 <h4 class="font-bold text-sm truncate" x-text="p.name"></h4>
@@ -122,7 +132,39 @@
                 </div>
             </div>
 
-            <!-- TAB: CHAT -->
+            <!-- TAB: LIVE WEBSITE PREVIEW -->
+            <div x-show="tab==='website'" class="website-preview min-h-screen bg-white rounded-lg shadow-2xl border border-gray-300 overflow-hidden">
+                <header class="bg-blue-900 text-white p-4 flex justify-between items-center">
+                    <div class="font-bold text-xl"><span x-text="agencyName"></span> Store</div>
+                </header>
+                <section class="text-center py-10 bg-blue-50">
+                    <h1 class="text-3xl font-bold text-blue-900">Welcome to Our Store</h1>
+                    <p class="text-gray-600">Partner: <span x-text="userData.fullName"></span></p>
+                </section>
+                <section class="p-8">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <template x-for="p in myInventory">
+                            <div class="bg-white p-4 rounded shadow text-center">
+                                <img :src="getImage(p)" class="h-40 mx-auto object-contain mb-2">
+                                <h3 class="font-bold" x-text="p.name"></h3>
+                                <p class="text-blue-600 font-bold" x-text="'$' + p.sellingPrice"></p>
+                                <button @click="addToCart(p)" class="mt-2 bg-blue-600 text-white px-4 py-2 rounded w-full">Add to Cart</button>
+                            </div>
+                        </template>
+                    </div>
+                </section>
+                <!-- Simple Cart for Website -->
+                <div x-show="cart.length > 0" class="fixed bottom-4 right-4 bg-white p-4 shadow-xl border rounded-lg w-72 z-50">
+                    <h3 class="font-bold border-b pb-2">Your Cart</h3>
+                    <template x-for="i in cart"><div class="text-sm flex justify-between my-1"><span x-text="i.name"></span><span x-text="'$'+i.sellingPrice"></span></div></template>
+                    <div class="font-bold mt-2 pt-2 border-t flex justify-between"><span>Total</span><span x-text="'$' + cartTotal"></span></div>
+                    <input x-model="customerName" placeholder="Name" class="w-full border p-1 rounded mt-2 text-sm">
+                    <input x-model="customerPhone" placeholder="Phone" class="w-full border p-1 rounded mt-1 text-sm">
+                    <button @click="checkout" class="w-full bg-green-500 text-white mt-2 py-1 rounded font-bold">Order on WhatsApp</button>
+                </div>
+            </div>
+
+            <!-- OTHER TABS (Chat, Rate, Profile) -->
             <div x-show="tab==='support'" class="h-[80vh] flex flex-col bg-white rounded shadow">
                 <div class="p-4 border-b font-bold bg-gray-50">Chat with Manufacturer</div>
                 <div class="flex-1 overflow-y-auto p-4 space-y-3" id="chatBox">
@@ -140,13 +182,23 @@
                 </div>
             </div>
 
-            <!-- TAB: PROFILE -->
+            <div x-show="tab==='rate'">
+                <h2 class="text-2xl font-bold mb-6">Rate Your Manufacturer</h2>
+                <div class="bg-white p-6 rounded shadow max-w-lg">
+                    <div class="flex gap-2 mb-4">
+                        <template x-for="i in 5"><button @click="reviewRating=i" class="text-3xl" :class="i<=reviewRating?'text-yellow-500':'text-gray-300'">★</button></template>
+                    </div>
+                    <textarea x-model="reviewText" class="w-full border p-2 rounded mb-4" placeholder="Write a review..."></textarea>
+                    <button @click="submitReview" class="bg-yellow-500 text-white px-6 py-2 rounded font-bold">Submit Review</button>
+                </div>
+            </div>
+
             <div x-show="tab==='profile'">
                 <h2 class="text-2xl font-bold mb-6">Profile</h2>
                 <div class="bg-white p-6 rounded shadow max-w-lg space-y-4">
                     <input x-model="profileForm.fullName" class="w-full border p-2 rounded">
                     <input x-model="profileForm.phone" class="w-full border p-2 rounded">
-                    <input x-model="profileForm.bankInfo" class="w-full border p-2 rounded">
+                    <input x-model="profileForm.address" class="w-full border p-2 rounded">
                     <button @click="saveProfile" class="bg-green-600 text-white px-6 py-2 rounded">Update</button>
                 </div>
             </div>
@@ -161,6 +213,7 @@
                 profileComplete: false, loading: true, profileForm: {},
                 manufacturerCatalog: [], myInventory: [], categories: [], filterCategory: '',
                 messages: [], chatInput: '', reviewRating: 0, reviewText: '',
+                cart: [], customerName: '', customerPhone: '',
 
                 init() {
                     auth.onAuthStateChanged(user => {
@@ -175,6 +228,15 @@
                     if(!this.filterCategory) return this.manufacturerCatalog;
                     return this.manufacturerCatalog.filter(p => p.category === this.filterCategory);
                 },
+                
+                get cartTotal() { return this.cart.reduce((sum, i) => sum + parseFloat(i.sellingPrice), 0); },
+
+                // FIX: Helper to handle both Old (string) and New (array) image formats
+                getImage(p) {
+                    if (Array.isArray(p.images) && p.images.length > 0) return p.images[0];
+                    if (p.image) return p.image;
+                    return 'https://via.placeholder.com/150';
+                },
 
                 async loadData() {
                     const db = firebase.firestore();
@@ -187,6 +249,9 @@
                             this.listenChat();
                             this.loadCatalog(this.userData.parentAgency);
                             this.loadMyInventory();
+                            // Get Agency Name
+                            const ag = await db.collection('agencies').doc(this.userData.parentAgency).get();
+                            if(ag.exists) this.agencyName = ag.data().agencyName;
                         } else this.profileComplete = false;
                     }
                     this.loading = false;
@@ -195,7 +260,6 @@
                 async loadCatalog(agencyId) {
                     const snap = await firebase.firestore().collection('agencies').doc(agencyId).collection('master_catalog').get();
                     this.manufacturerCatalog = snap.docs.map(d => ({id: d.id, ...d.data()}));
-                    // Extract Categories
                     this.categories = [...new Set(this.manufacturerCatalog.map(p => p.category))];
                 },
 
@@ -204,30 +268,31 @@
                     this.myInventory = snap.docs.map(d => ({id: d.id, ...d.data()}));
                 },
 
-                // STOCK STATUS CHECKER
                 isStockAvailable(originalId) {
-                    const product = this.manufacturerCatalog.find(p => p.id === originalId);
-                    return product && product.stock > 0;
+                    const p = this.manufacturerCatalog.find(i => i.id === originalId);
+                    return p && p.stock > 0;
                 },
                 getStockStatus(originalId) {
-                    const product = this.manufacturerCatalog.find(p => p.id === originalId);
-                    if(!product) return 'Unavailable';
-                    return product.stock > 0 ? 'In Stock (' + product.stock + ')' : 'Out of Stock';
+                    const p = this.manufacturerCatalog.find(i => i.id === originalId);
+                    return (p && p.stock > 0) ? 'In Stock ('+p.stock+')' : 'Out of Stock';
                 },
 
                 async importProduct(p) {
                     if(this.myInventory.find(i => i.name === p.name)) return alert("Already added!");
                     
+                    // Save with correct Image format
+                    const img = this.getImage(p);
+                    
                     await firebase.firestore().collection('users').doc(this.uid).collection('products').add({
                         name: p.name,
                         basePrice: p.price,
                         sellingPrice: p.price, 
-                        image: p.images ? p.images[0] : '',
-                        originalId: p.id, // Links back to Manufacturer Stock
-                        category: p.category
+                        image: img, 
+                        originalId: p.id,
+                        category: p.category || 'General'
                     });
                     this.loadMyInventory();
-                    alert("Added!");
+                    alert("Added to your store!");
                 },
 
                 async updatePrice(p) {
@@ -244,7 +309,29 @@
                     }
                 },
 
-                // --- EXISTING UTILS ---
+                // CART LOGIC
+                addToCart(p) { this.cart.push(p); },
+                async checkout() {
+                    if(!this.customerName || !this.customerPhone) return alert("Fill Name/Phone");
+                    const db = firebase.firestore();
+                    await db.collection('orders').add({
+                        customerName: this.customerName, customerPhone: this.customerPhone,
+                        items: this.cart, total: this.cartTotal,
+                        partnerId: this.uid, manufacturerId: this.userData.parentAgency,
+                        status: 'New', date: new Date()
+                    });
+                    
+                    let msg = `*New Order*\nName: ${this.customerName}\nPhone: ${this.customerPhone}\nItems:`;
+                    this.cart.forEach(i => msg += `\n- ${i.name}: $${i.sellingPrice}`);
+                    msg += `\nTotal: $${this.cartTotal}`;
+                    
+                    const partnerPhone = this.userData.phone.replace(/[^0-9]/g, '');
+                    window.open(`https://wa.me/${partnerPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+                    
+                    this.cart = []; alert("Order Sent!");
+                },
+
+                // Existing Tools
                 async saveProfile() {
                     if(!this.profileForm.phone) return alert("Fill details");
                     await firebase.firestore().collection('users').doc(this.uid).update(this.profileForm);
@@ -264,8 +351,15 @@
                     });
                     this.chatInput = '';
                 },
+                async submitReview() {
+                    if(this.reviewRating===0) return alert("Rate stars");
+                    await firebase.firestore().collection('agencies').doc(this.userData.parentAgency).collection('reviews').add({
+                        rating: this.reviewRating, comment: this.reviewText, partnerName: this.userData.fullName, date: new Date()
+                    });
+                    alert("Review Submitted!");
+                },
                 async reportIssue() {
-                    if(confirm("Report to Admin?")) {
+                    if(confirm("Report to Super Admin?")) {
                         await firebase.firestore().collection('disputes').add({
                             agencyId: this.userData.parentAgency, clientEmail: this.userData.email,
                             clientName: this.userData.fullName, clientPhone: this.userData.phone,
