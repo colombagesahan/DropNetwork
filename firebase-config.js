@@ -11,9 +11,9 @@ if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
 
-// Safe initialization
-if (firebase.auth) {
-  window.auth = firebase.auth();
+// Safety check for auth availability
+if (typeof firebase !== 'undefined' && firebase.auth) {
+    window.auth = firebase.auth();
 }
 window.db = firebase.firestore();
 
